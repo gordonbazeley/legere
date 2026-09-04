@@ -12,7 +12,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 FONT=resources/fonts/Michroma-Regular.ttf
 OUT_DIR=resources/images
-STROKE=8          # faux-bold, in 400pt-render pixels
+STROKE=8          # base faux-bold, in 400pt-render pixels
+BOLD_PX=3         # extra weight added to each digit, in final screen pixels
 mkdir -p "$OUT_DIR"
 
 # build_sheet <name> <max digit width> <max digit height>
@@ -30,11 +31,16 @@ build_sheet() {
     (( h > raw_h )) && raw_h=$h
   done
 
-  pct=$(awk -v mw="$max_w" -v mh="$max_h" -v rw="$raw_w" -v rh="$raw_h" \
+  # Leave room for the dilate so the finished digit still fits max_w x max_h.
+  pct=$(awk -v mw="$((max_w - BOLD_PX))" -v mh="$((max_h - BOLD_PX))" \
+            -v rw="$raw_w" -v rh="$raw_h" \
         'BEGIN { x = mw/rw; y = mh/rh; printf "%.4f", (x < y ? x : y) * 100 }')
 
+  local radius
+  radius=$(awk -v b="$BOLD_PX" 'BEGIN { printf "%.2f", b / 2 }')
   for d in 0 1 2 3 4 5 6 7 8 9; do
-    magick "$tmp/r$d.png" -filter Lanczos -resize "${pct}%" "$tmp/s$d.png"
+    magick "$tmp/r$d.png" -filter Lanczos -resize "${pct}%" \
+      -morphology Dilate "Disk:${radius}" "$tmp/s$d.png"
     w=$(magick identify -format '%w' "$tmp/s$d.png")
     h=$(magick identify -format '%h' "$tmp/s$d.png")
     (( w > slot_w )) && slot_w=$w

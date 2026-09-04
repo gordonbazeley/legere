@@ -86,13 +86,16 @@ static void prv_set_ink(GBitmap *b, GColor c) {
   }
 }
 
+#define DATE_BOLD_PX 2   // faux-bold smear for the date row (Michroma has one weight)
+
 static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font,
                           GTextAlignment align, GColor color) {
   graphics_context_set_text_color(ctx, color);
-  graphics_draw_text(ctx, text, font, box, GTextOverflowModeFill, align, NULL);
-  // Faux-bold: Michroma has one weight, so overprint one pixel to the right.
-  box.origin.x += 1;
-  graphics_draw_text(ctx, text, font, box, GTextOverflowModeFill, align, NULL);
+  for (int dx = 0; dx <= DATE_BOLD_PX; dx++) {
+    GRect b = box;
+    b.origin.x += dx;
+    graphics_draw_text(ctx, text, font, b, GTextOverflowModeFill, align, NULL);
+  }
 }
 
 static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
