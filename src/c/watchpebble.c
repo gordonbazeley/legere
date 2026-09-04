@@ -32,8 +32,8 @@ static int s_pad;
 static int s_usable_w;
 
 #define PAD PBL_IF_ROUND_ELSE(18, 6)
-#define DIGIT_GAP 4            // px between the hour and minute rows
-#define DIGIT_BAND_BOT_GAP 4  // px between the minute row and the date row
+#define DIGIT_GAP PBL_IF_ROUND_ELSE(4, 12)  // px between the hour and minute rows
+#define DIGIT_BAND_BOT_GAP 4               // px between the minute row and the date row
 
 static GSize prv_measure(const char *text, GFont font) {
   return graphics_text_layout_get_content_size(text, font, GRect(0, 0, 400, 300),
@@ -115,15 +115,14 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
   for (char *c = dow; *c; c++) *c = toupper((unsigned char)*c);
   for (char *c = mon; *c; c++) *c = toupper((unsigned char)*c);
 
-  // Hour and minute as a 2x2 grid: one digit per quadrant, right-aligned in its
-  // column, the two rows packed tight (only DIGIT_GAP between them) and the
-  // whole block centred in the space above the date. On the round display the
-  // grid is pulled in from both edges so its corners clear the bezel — same
-  // proportions as the rectangular face, just inscribed.
+  // Hour and minute stacked: two digits per row, the pair centred as a unit so a
+  // narrow "1" doesn't shove the block sideways. Rows packed tight (only
+  // DIGIT_GAP between them) and the whole block centred in the space above the
+  // date. On the round display the grid is pulled in from both edges so its
+  // corners clear the bezel — same proportions as the rectangular face.
   if (s_sheet) {
     int grid_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
     int grid_x = s_pad + (s_usable_w - grid_w) / 2;
-    int col_w = grid_w / 2;
     int block_h = 2 * s_slot_h + DIGIT_GAP;
     int block_top = s_digit_band_top + PBL_IF_ROUND_ELSE(2, 0) +
                     (s_date_top - DIGIT_BAND_BOT_GAP - s_digit_band_top - block_h) / 2;
@@ -131,13 +130,16 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
     bool blank_hour_tens = !h24 && hour < 10;
 
     graphics_context_set_compositing_mode(ctx, GCompOpSet);
-    for (int i = 0; i < 4; i++) {
-      if (i == 0 && blank_hour_tens) continue;
-      int col = i & 1, row = i >> 1;
-      int x = grid_x + col * col_w + col_w - s_slot_w;  // right-aligned in column
+    for (int row = 0; row < 2; row++) {
+      int n = (row == 0 && blank_hour_tens) ? 1 : 2;  // digits shown on this row
+      int row_x = grid_x + (grid_w - n * s_slot_w) / 2;
       int y = block_top + row * (s_slot_h + DIGIT_GAP);
-      prv_set_ink(s_digit[dv[i]], row == 0 ? GColorLightGray : GColorWhite);
-      graphics_draw_bitmap_in_rect(ctx, s_digit[dv[i]], GRect(x, y, s_slot_w, s_slot_h));
+      for (int k = 0; k < n; k++) {
+        int idx = row * 2 + (n == 1 ? 1 : k);
+        prv_set_ink(s_digit[dv[idx]], row == 0 ? GColorLightGray : GColorWhite);
+        graphics_draw_bitmap_in_rect(ctx, s_digit[dv[idx]],
+                                     GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h));
+      }
     }
   } else {
     // Resource-load failure only: fall back to plain text.
@@ -200,11 +202,11 @@ static void prv_window_load(Window *window) {
   s_usable_w = bounds.size.w - 2 * s_pad;
 
   // Round screens clip their corners — keep content well off the top/bottom.
-  int top_margin = PBL_IF_ROUND_ELSE(16, 6);
+  int top_margin = PBL_IF_ROUND_ELSE(16, 2);
   int bot_margin = PBL_IF_ROUND_ELSE(22, 2);
 
 #if defined(PBL_PLATFORM_EMERY)
-  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_18));
+  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_21));
 #else
   s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_14));
 #endif

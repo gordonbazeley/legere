@@ -48,7 +48,7 @@ build_sheet() {
   done
 
   for d in 0 1 2 3 4 5 6 7 8 9; do
-    magick "$tmp/s$d.png" -background none -gravity SouthEast \
+    magick "$tmp/s$d.png" -background none -gravity South \
       -extent "${slot_w}x${slot_h}" "$tmp/p$d.png"
   done
 
@@ -62,4 +62,4 @@ build_sheet() {
 
 #            name       max_w max_h
 build_sheet  digits        66    62   # gabbro (180x180 round)
-build_sheet  digits_lg     92    98   # emery  (200x228)
+build_sheet  digits_lg     99    94   # emery  (200x228)

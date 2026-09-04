@@ -41,7 +41,7 @@
         },
         {
           "type": "font",
-          "name": "FONT_DATE_18",
+          "name": "FONT_DATE_21",
           "file": "fonts/MichromaText.ttf",
           "characterRegex": "[A-Z0-9 ]",
           "targetPlatforms": ["emery"]
