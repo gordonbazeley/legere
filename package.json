@@ -15,9 +15,21 @@
       "gabbro"
     ],
     "watchapp": {
-      "watchface": true
+      "watchface": true,
+      "configurable": true
     },
-    "capabilities": [],
+    "capabilities": [
+      "configurable"
+    ],
+    "messageKeys": [
+      "RequestLog",
+      "Year",
+      "Mon",
+      "Mday",
+      "Shakes",
+      "QuietMask",
+      "Done"
+    ],
     "resources": {
       "media": [
         {
