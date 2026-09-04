@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 FONT=resources/fonts/Michroma-Regular.ttf
 OUT_DIR=resources/images
 STROKE=8          # base faux-bold, in 400pt-render pixels
-BOLD_PX=3         # extra weight added to each digit, in final screen pixels
+BOLD_PX=5         # extra weight added to each digit, in final screen pixels
 mkdir -p "$OUT_DIR"
 
 # build_sheet <name> <max digit width> <max digit height>

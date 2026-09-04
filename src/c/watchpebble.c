@@ -86,7 +86,7 @@ static void prv_set_ink(GBitmap *b, GColor c) {
   }
 }
 
-#define DATE_BOLD_PX 2   // faux-bold smear for the date row (Michroma has one weight)
+#define DATE_BOLD_PX 1   // faux-bold smear for the date row (Michroma has one weight)
 
 static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font,
                           GTextAlignment align, GColor color) {
@@ -117,11 +117,15 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
 
   // Hour and minute as a 2x2 grid: one digit per quadrant, right-aligned in its
   // column, the two rows packed tight (only DIGIT_GAP between them) and the
-  // whole block centred in the space above the date.
+  // whole block centred in the space above the date. On the round display the
+  // grid is pulled in from both edges so its corners clear the bezel — same
+  // proportions as the rectangular face, just inscribed.
   if (s_sheet) {
-    int col_w = s_usable_w / 2;
+    int grid_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
+    int grid_x = s_pad + (s_usable_w - grid_w) / 2;
+    int col_w = grid_w / 2;
     int block_h = 2 * s_slot_h + DIGIT_GAP;
-    int block_top = s_digit_band_top +
+    int block_top = s_digit_band_top + PBL_IF_ROUND_ELSE(2, 0) +
                     (s_date_top - DIGIT_BAND_BOT_GAP - s_digit_band_top - block_h) / 2;
     int dv[4] = { hour / 10, hour % 10, disp_min / 10, disp_min % 10 };
     bool blank_hour_tens = !h24 && hour < 10;
@@ -130,7 +134,7 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
     for (int i = 0; i < 4; i++) {
       if (i == 0 && blank_hour_tens) continue;
       int col = i & 1, row = i >> 1;
-      int x = s_pad + col * col_w + col_w - s_slot_w;  // right-aligned in column
+      int x = grid_x + col * col_w + col_w - s_slot_w;  // right-aligned in column
       int y = block_top + row * (s_slot_h + DIGIT_GAP);
       prv_set_ink(s_digit[dv[i]], row == 0 ? GColorLightGray : GColorWhite);
       graphics_draw_bitmap_in_rect(ctx, s_digit[dv[i]], GRect(x, y, s_slot_w, s_slot_h));
@@ -196,8 +200,8 @@ static void prv_window_load(Window *window) {
   s_usable_w = bounds.size.w - 2 * s_pad;
 
   // Round screens clip their corners — keep content well off the top/bottom.
-  int top_margin = PBL_IF_ROUND_ELSE(14, 6);
-  int bot_margin = PBL_IF_ROUND_ELSE(34, 2);
+  int top_margin = PBL_IF_ROUND_ELSE(16, 6);
+  int bot_margin = PBL_IF_ROUND_ELSE(22, 2);
 
 #if defined(PBL_PLATFORM_EMERY)
   s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_18));
