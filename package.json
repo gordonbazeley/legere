@@ -11,20 +11,42 @@
     "sdkVersion": "3",
     "enableMultiJS": true,
     "targetPlatforms": [
-      "aplite",
-      "basalt",
-      "chalk",
-      "diorite",
       "emery",
-      "flint",
       "gabbro"
     ],
     "watchapp": {
       "watchface": true
     },
-    "capabilities": ["health"],
+    "capabilities": [],
     "resources": {
-      "media": []
+      "media": [
+        {
+          "type": "bitmap",
+          "name": "IMAGE_DIGITS",
+          "file": "images/digits.png",
+          "targetPlatforms": ["gabbro"]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_DIGITS_LG",
+          "file": "images/digits_lg.png",
+          "targetPlatforms": ["emery"]
+        },
+        {
+          "type": "font",
+          "name": "FONT_DATE_14",
+          "file": "fonts/MichromaText.ttf",
+          "characterRegex": "[A-Z0-9 ]",
+          "targetPlatforms": ["gabbro"]
+        },
+        {
+          "type": "font",
+          "name": "FONT_DATE_18",
+          "file": "fonts/MichromaText.ttf",
+          "characterRegex": "[A-Z0-9 ]",
+          "targetPlatforms": ["emery"]
+        }
+      ]
     }
   }
 }
