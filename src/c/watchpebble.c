@@ -90,6 +90,9 @@ static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font
                           GTextAlignment align, GColor color) {
   graphics_context_set_text_color(ctx, color);
   graphics_draw_text(ctx, text, font, box, GTextOverflowModeFill, align, NULL);
+  // Faux-bold: Michroma has one weight, so overprint one pixel to the right.
+  box.origin.x += 1;
+  graphics_draw_text(ctx, text, font, box, GTextOverflowModeFill, align, NULL);
 }
 
 static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
@@ -142,8 +145,8 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
   // strings over one shared box (Michroma is too wide to force equal thirds and
   // stay legible). Month colour signals freshness: red = exact (just refreshed),
   // blue = passive 5-minute reading.
-  // Light blue: dark blue is unreadable on the transflective LCD without light.
-  GColor mon_color = s_exact ? GColorRed : GColorPictonBlue;
+  // Bright blue: darker blues are unreadable on the transflective LCD unlit.
+  GColor mon_color = s_exact ? GColorRed : GColorElectricBlue;
   int date_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, s_date_top, date_w, s_date_h);
   prv_draw_cell(ctx, date_box, dow, s_date_font, GTextAlignmentLeft, GColorWhite);
