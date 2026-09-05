@@ -41,7 +41,7 @@ STROKE=0          # base faux-bold, in 400pt-render pixels
 BOLD_PX=0         # extra weight added to each digit, in final screen pixels
 FILL_SCALE=1.00   # shrink each digit to this fraction of its max_w x max_h cell
 COUNTER_HOLE=14   # grows each glyph's enclosed counter, in 400pt-render pixels
-STROKE_THIN=0     # light overall erode to cut blockiness, in 400pt-render pixels
+STROKE_THIN=8     # light overall erode to cut blockiness, in 400pt-render pixels
 ALPHA_LEVELS=8    # even alpha steps (0..255) per glyph edge, instead of binary
 MIN_GAP=4         # left-side breathing room reserved in every slot, in final px
 mkdir -p "$OUT_DIR"
