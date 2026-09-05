@@ -287,6 +287,11 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
 static int s_logged_hour = -1;
 static int s_logged_day_key = -1;  // year*10000 + mon*100 + mday
 
+// Minute of the last passive (schedule-driven) repaint, so a button press in
+// Quiet Time that lands in that same minute can be recognised as redundant.
+static int s_sched_hour = -1;
+static int s_sched_min = -1;
+
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // Log the hour that just finished, using s_today as it stood *before*
   // today's rollover below (so the last hour of a day still logs against
@@ -321,6 +326,8 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   int step = quiet ? 60 : 5;
   if (tick_time->tm_min % step == 0) {
     s_exact = false;
+    s_sched_hour = tick_time->tm_hour;
+    s_sched_min = tick_time->tm_min;
     layer_mark_dirty(s_canvas_layer);
   }
 }
@@ -328,9 +335,18 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 static void prv_backlight_handler(bool on) {
   // Backlight on = the user lit the screen to look (button in the dark, or
   // shake/flick-to-light). Passive listener on OS behaviour — costs nothing.
-  if (on) {
-    prv_refresh_to_exact();
+  if (!on) return;
+
+  // In Quiet Time, a button press (e.g. Back, exiting some other screen back
+  // to the face) still wants the exact time — but if the passive hourly
+  // repaint already landed in this same minute, forcing an exact/red redraw
+  // now would just flash the screen for no visible change. Skip it.
+  if (quiet_time_is_active()) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    if (t->tm_hour == s_sched_hour && t->tm_min == s_sched_min) return;
   }
+  prv_refresh_to_exact();
 }
 
 static void prv_tap_handler(AccelAxisType axis, int32_t direction) {

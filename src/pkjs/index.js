@@ -1,5 +1,5 @@
 // Phone-side settings page: pulls the watch's shake-to-wake log over
-// AppMessage and hands the user a CSV download. See src/c/watchpebble.c
+// AppMessage and hands the user a CSV download. See src/c/legere.c
 // for the on-watch side (DayRecord ring buffer + AppMessage export).
 
 var pad2 = function(n) { return (n < 10 ? '0' : '') + n; };

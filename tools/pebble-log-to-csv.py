@@ -2,7 +2,7 @@
 """Turn captured `pebble logs` output into the shake-log CSV.
 
 Stopgap for the official Pebble app not offering a Settings webview for
-sideloaded apps yet (see watchpebble.c). The watch already logs one
+sideloaded apps yet (see legere.c). The watch already logs one
 finished-hour row per hour in the exact CSV shape; this just pulls those
 lines out of a log capture.
 
