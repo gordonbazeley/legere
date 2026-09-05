@@ -34,6 +34,12 @@
       "media": [
         {
           "type": "bitmap",
+          "name": "MENU_ICON",
+          "file": "images/icon.png",
+          "menuIcon": true
+        },
+        {
+          "type": "bitmap",
           "name": "IMAGE_DIGITS",
           "file": "images/digits.png",
           "targetPlatforms": ["gabbro"]

@@ -33,8 +33,8 @@ static int s_pad;
 static int s_usable_w;
 
 #define PAD PBL_IF_ROUND_ELSE(18, 6)
-#define DIGIT_GAP PBL_IF_ROUND_ELSE(4, 12)  // px between the hour and minute rows
-#define DIGIT_BAND_BOT_GAP 4               // px between the minute row and the date row
+#define DIGIT_GAP PBL_IF_ROUND_ELSE(4, 5)   // px between the hour and minute rows
+#define DIGIT_BAND_BOT_GAP PBL_IF_ROUND_ELSE(4, 5)  // px between the minute row and the date row
 
 static GSize prv_measure(const char *text, GFont font) {
   return graphics_text_layout_get_content_size(text, font, GRect(0, 0, 400, 300),
@@ -175,10 +175,9 @@ static void prv_refresh_to_exact(void) {
   layer_mark_dirty(s_canvas_layer);
 }
 
-// Recolour a digit by poking the sheet's palette — the digits are white ink over
-// a graded alpha edge, so tint every visible entry to `c` while keeping its
-// alpha. No second bitmap; sub-bitmaps share the parent's palette, so call this
-// immediately before each blit.
+// Recolour a digit by poking the sheet's palette — tint every visible palette
+// entry to `c`. No second bitmap; sub-bitmaps share the parent's palette, so
+// call this immediately before each blit.
 static void prv_set_ink(GBitmap *b, GColor c) {
   int n;
   switch (gbitmap_get_format(b)) {
@@ -292,11 +291,17 @@ static int s_logged_day_key = -1;  // year*10000 + mon*100 + mday
 static int s_sched_hour = -1;
 static int s_sched_min = -1;
 
+// year*10000 + mon*100 + mday for s_today — a comparable key for "did the
+// date change", used both to detect rollover and to remember what was logged.
+static int prv_day_key(void) {
+  return s_today.year * 10000 + s_today.mon * 100 + s_today.mday;
+}
+
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // Log the hour that just finished, using s_today as it stood *before*
   // today's rollover below (so the last hour of a day still logs against
   // the correct outgoing date).
-  int day_key = s_today.year * 10000 + s_today.mon * 100 + s_today.mday;
+  int day_key = prv_day_key();
   if (s_logged_hour >= 0 && day_key != 0 &&
       (s_logged_hour != tick_time->tm_hour || s_logged_day_key != day_key)) {
     bool was_quiet = (s_today.quiet_mask & (1UL << s_logged_hour)) != 0;
@@ -317,7 +322,7 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
     prv_persist_today();
   }
   s_logged_hour = tick_time->tm_hour;
-  s_logged_day_key = s_today.year * 10000 + s_today.mon * 100 + s_today.mday;
+  s_logged_day_key = prv_day_key();
 
   // The OS wakes the app every minute for its own clock; we only repaint on the
   // 5-minute grid — and just hourly while the user's Quiet Time is on (asleep or
@@ -370,7 +375,10 @@ static void prv_window_load(Window *window) {
   s_usable_w = bounds.size.w - 2 * s_pad;
 
   // Round screens clip their corners — keep content well off the top/bottom.
-  int top_margin = PBL_IF_ROUND_ELSE(16, 2);
+  // Rect (Emery) top_margin doubles as the literal margin above the digit
+  // block (see s_date_top below) — round keeps its bot_margin-anchored,
+  // bezel-tuned layout untouched.
+  int top_margin = PBL_IF_ROUND_ELSE(16, 5);
   int bot_margin = PBL_IF_ROUND_ELSE(22, 2);
 
 #if defined(PBL_PLATFORM_EMERY)
@@ -381,7 +389,6 @@ static void prv_window_load(Window *window) {
   s_date_font_custom = (s_date_font != NULL);
   if (!s_date_font) s_date_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
   s_date_h = prv_measure("WO", s_date_font).h + 2;
-  s_date_top = bounds.size.h - bot_margin - s_date_h;
 
 #if defined(PBL_PLATFORM_EMERY)
   s_sheet = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DIGITS_LG);   // 200x228 rect
@@ -397,6 +404,15 @@ static void prv_window_load(Window *window) {
           s_sheet, GRect(i * s_slot_w, 0, s_slot_w, s_slot_h));
     }
   }
+
+#if defined(PBL_PLATFORM_EMERY)
+  // Stack top-down with the 3 fixed 5px gaps, rather than centering the
+  // block in whatever space bot_margin leaves — so all 3 gaps actually are
+  // 5px instead of splitting leftover slack between them.
+  s_date_top = top_margin + 2 * s_slot_h + DIGIT_GAP + DIGIT_BAND_BOT_GAP;
+#else
+  s_date_top = bounds.size.h - bot_margin - s_date_h;
+#endif
 
   s_digit_band_top = top_margin;
 
