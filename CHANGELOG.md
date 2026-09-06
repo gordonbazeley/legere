@@ -8,6 +8,8 @@
   the font is Quantico Bold instead of Michroma — a real bold weight instead
   of a faux-bold pixel smear (Michroma has no bold cut at all). Tried Orbitron
   Bold first, but its zero has a diagonal slash through it; Quantico doesn't.
+  Sizes bumped too: gabbro 14px -> 16px, emery 21px -> 24px (20px where the
+  locale's widest weekday/month strings don't fit at 24, was 18px).
 - Minute row is now offset 15px left of the hour row for a slight stagger.
 - Passive-minute static is dialed back (was a full 1000/1000 permille snowed,
   now 350/1000) so it reads as less agitated.

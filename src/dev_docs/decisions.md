@@ -159,9 +159,9 @@ likely break the layout for a date line.
 **State:** implemented, pending a hardware pass. `setlocale` wired in `prv_init`;
 `prv_utf8_upper` does non-ASCII uppercasing; date font is `Quantico-Bold.ttf`
 subset to `[A-Z0-9 .À-Öß]` (Quantico's cmap has no gaps in that range).
-Emery picks 21px or 18px at load
+Emery picks 24px or 20px at load
 (`prv_pick_date_font`) by measuring the locale's widest weekday/month strings —
-FR/ES overrun 21px ("SEPT." + accented period-weekdays), the rest keep 21.
+FR/ES overrun 24px ("SEPT." + accented period-weekdays), the rest keep 24.
 Untested with a real non-English language pack — the emulator can't install one.
 
 ## Diagnostic instrumentation is temporary

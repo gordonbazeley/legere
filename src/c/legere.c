@@ -356,14 +356,14 @@ static void prv_utf8_upper(char *s) {
 #if defined(PBL_PLATFORM_EMERY)
 #define DATE_CELL_GAP 6   // min px wanted between the weekday / day / month cells
 
-// The date row wants 21px, but the widest localised rows (FR/ES: "SEPT." plus an
-// accented weekday) overrun s_usable_w at 21 and the three L/C/R cells collide.
+// The date row wants 24px, but the widest localised rows (FR/ES: "SEPT." plus an
+// accented weekday) overrun s_usable_w at 24 and the three L/C/R cells collide.
 // Rather than hardcode which locales are wide, measure every weekday + month
-// abbreviation this locale actually produces and only drop to 18px if 21 won't
+// abbreviation this locale actually produces and only drop to 20px if 24 won't
 // fit. One-time at window load — not on any repaint path.
 static GFont prv_pick_date_font(void) {
-  GFont big = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_21));
-  if (!big) return fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_18));
+  GFont big = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_24));
+  if (!big) return fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_20));
 
   struct tm probe;
   memset(&probe, 0, sizeof probe);
@@ -387,7 +387,7 @@ static GFont prv_pick_date_font(void) {
   if (need <= s_usable_w) return big;
 
   fonts_unload_custom_font(big);
-  return fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_18));
+  return fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_20));
 }
 #endif
 
@@ -608,9 +608,9 @@ static void prv_window_load(Window *window) {
   int top_margin = PBL_IF_ROUND_ELSE(28, 5);
 
 #if defined(PBL_PLATFORM_EMERY)
-  s_date_font = prv_pick_date_font();   // 21px, or 18px where the locale is too wide
+  s_date_font = prv_pick_date_font();   // 24px, or 20px where the locale is too wide
 #else
-  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_14));
+  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_16));
 #endif
   s_date_font_custom = (s_date_font != NULL);
   if (!s_date_font) s_date_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);

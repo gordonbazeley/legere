@@ -58,8 +58,8 @@
   the Latin-1 accented block. Date font is `Quantico-Bold.ttf` subset to
   `[A-Z0-9 .À-Öß]` (Quantico's cmap has no gaps in that range). Emery date
   font is picked at window load
-  (`prv_pick_date_font`): 21px normally, 18px only if the locale's widest
-  weekday+month abbreviations wouldn't fit at 21 (FR/ES, with "SEPT." + accented
+  (`prv_pick_date_font`): 24px normally, 20px only if the locale's widest
+  weekday+month abbreviations wouldn't fit at 24 (FR/ES, with "SEPT." + accented
   period-weekdays). Untested on real hardware with a non-English language pack.
 - **Store listing pass** — no store assets, description, or screenshots; the
   diagnostic instrumentation is still in.
@@ -113,7 +113,7 @@
 | `package.json` | Pebble metadata, message keys, resources |
 | `wscript` | SDK build rules (unmodified) |
 | `resources/fonts/AlfaSlabOne-Regular.ttf` | Source for the digit sprite sheets |
-| `resources/fonts/Quantico-Bold.ttf` | Date row font (`FONT_DATE_14` on gabbro; `FONT_DATE_21` or `_18` on emery, picked at load) |
+| `resources/fonts/Quantico-Bold.ttf` | Date row font (`FONT_DATE_16` on gabbro; `FONT_DATE_24` or `_20` on emery, picked at load) |
 | `resources/images/digits.png` | gabbro sprite sheet — slot 73×80 |
 | `resources/images/digits_lg.png` | emery sprite sheet — slot 93×103 |
 | `resources/images/icon.png` | Launcher icon, 25×25, white glyph + black keyline |

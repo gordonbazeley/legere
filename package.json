@@ -53,21 +53,21 @@
         },
         {
           "type": "font",
-          "name": "FONT_DATE_14",
+          "name": "FONT_DATE_16",
           "file": "fonts/Quantico-Bold.ttf",
           "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["gabbro"]
         },
         {
           "type": "font",
-          "name": "FONT_DATE_18",
+          "name": "FONT_DATE_20",
           "file": "fonts/Quantico-Bold.ttf",
           "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["emery"]
         },
         {
           "type": "font",
-          "name": "FONT_DATE_21",
+          "name": "FONT_DATE_24",
           "file": "fonts/Quantico-Bold.ttf",
           "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["emery"]
