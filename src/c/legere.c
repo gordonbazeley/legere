@@ -45,18 +45,24 @@ static int s_drawn_min = -1;
 // SHIMMER_FRAMES redraws SHIMMER_MS apart, each snowing a smaller fraction of
 // the minute ink than the last, so the digits surface out of the noise like a
 // tuner pulling a station in. The frame that lands on 0 is the clean render.
+// The same ramp plays in reverse when the clock ticks past the locked minute
+// (s_shimmer_out): the minute decays back into static instead of cutting out.
 // HW-tune this (feel of the lock-on) alongside the values themselves.
 #define SHIMMER_FRAMES 8
 #define SHIMMER_MS 40
-static int s_shimmer_left = 0;         // frames remaining in the lock-on ramp (SHIMMER_FRAMES..0)
+static int s_shimmer_left = 0;         // frames remaining in the ramp (SHIMMER_FRAMES..0)
+static bool s_shimmer_out = false;     // true = ramp running snow-ward (lock lost), false = lock-on
 static AppTimer *s_shimmer_timer = NULL;
 
 // Snow density for the current frame, in permille of the minute-ink pixels:
-// 1000 = every pixel (passive / no signal), 0 = clean. During the lock-on ramp
-// it steps down SHIMMER_FRAMES..0 -> 1000..0.
+// 1000 = every pixel (passive / no signal), 0 = clean. A ramp in flight wins
+// over s_exact: lock-on steps 1000->0, lock-out steps 0->1000.
 static int prv_snow_permille(void) {
-  if (!s_exact) return 1000;
-  return s_shimmer_left * 1000 / SHIMMER_FRAMES;
+  if (s_shimmer_left > 0) {
+    int snowed = s_shimmer_out ? SHIMMER_FRAMES - s_shimmer_left : s_shimmer_left;
+    return snowed * 1000 / SHIMMER_FRAMES;
+  }
+  return s_exact ? 0 : 1000;
 }
 
 static int s_digit_band_top; // top y of the digit grid
@@ -92,7 +98,7 @@ static int prv_display_hour(const struct tm *t) {
 // to the phone and exported — instrumentation to check whether the 5-minute
 // grid is worth keeping vs. just redrawing every minute.
 //
-// ponytail: DAYS_KEPT days ring-buffered in persist storage (32B/day, well
+// ponytail: DAYS_KEPT days ring-buffered in persist storage (56B/day, well
 // under the persist quota). Bump it if more history is needed.
 #define DAYS_KEPT 14
 #define PERSIST_KEY_DAY_CURSOR 190          // int: index of "today"'s slot
@@ -104,6 +110,9 @@ typedef struct __attribute__((__packed__)) {
   uint8_t mday;          // 1-31
   uint8_t shakes[24];    // trigger count per hour-of-day, capped at 60
   uint32_t quiet_mask;   // bit h set = Quiet Time was on during hour h
+  // battery must stay last: a pre-battery 32-byte blob then reads back
+  // year..quiet_mask exactly and leaves battery[] at its init value.
+  uint8_t battery[24];   // charge_percent sampled in hour h; 0xFF = no sample
 } DayRecord;
 
 static int s_day_cursor = -1;  // -1 = not loaded from persist yet this run
@@ -120,6 +129,7 @@ static void prv_ensure_today(const struct tm *t) {
   if (s_day_cursor < 0) {
     s_day_cursor = persist_exists(PERSIST_KEY_DAY_CURSOR) ? persist_read_int(PERSIST_KEY_DAY_CURSOR) : 0;
     memset(&s_today, 0, sizeof(s_today));
+    memset(s_today.battery, 0xFF, sizeof s_today.battery);
     persist_read_data(PERSIST_KEY_DAY_BASE + s_day_cursor, &s_today, sizeof(s_today));
   }
   int year = t->tm_year + 1900, mon = t->tm_mon + 1, mday = t->tm_mday;
@@ -127,6 +137,7 @@ static void prv_ensure_today(const struct tm *t) {
     s_day_cursor = (s_day_cursor + 1) % DAYS_KEPT;
     persist_write_int(PERSIST_KEY_DAY_CURSOR, s_day_cursor);
     memset(&s_today, 0, sizeof(s_today));
+    memset(s_today.battery, 0xFF, sizeof s_today.battery);
     s_today.year = year;
     s_today.mon = mon;
     s_today.mday = mday;
@@ -162,6 +173,7 @@ static void prv_export_send_next(void) {
   for (int i = s_export_slot + 1; i < DAYS_KEPT; i++) {
     DayRecord rec;
     memset(&rec, 0, sizeof(rec));
+    memset(rec.battery, 0xFF, sizeof rec.battery);
     persist_read_data(PERSIST_KEY_DAY_BASE + i, &rec, sizeof(rec));
     if (rec.year == 0) continue;  // slot never written
 
@@ -171,6 +183,7 @@ static void prv_export_send_next(void) {
     dict_write_int32(iter, MESSAGE_KEY_Mon, rec.mon);
     dict_write_int32(iter, MESSAGE_KEY_Mday, rec.mday);
     dict_write_data(iter, MESSAGE_KEY_Shakes, rec.shakes, sizeof(rec.shakes));
+    dict_write_data(iter, MESSAGE_KEY_Battery, rec.battery, sizeof(rec.battery));
     dict_write_int32(iter, MESSAGE_KEY_QuietMask, (int32_t)rec.quiet_mask);
     dict_write_end(iter);
     app_message_outbox_send();
@@ -207,6 +220,8 @@ static void prv_shimmer_tick(void *context) {
   layer_mark_dirty(s_digits_layer);  // snow only touches the minute row
   if (s_shimmer_left > 0) {
     s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
+  } else if (s_shimmer_out) {
+    s_exact = false;  // lock-out ramp finished — minute row is passive static again
   }
 }
 
@@ -219,13 +234,15 @@ static int s_exact_min = -1;
 static void prv_refresh_to_exact(void) {
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
-  if (s_exact && prv_display_hour(t) == s_drawn_hour && t->tm_min == s_drawn_min) {
+  if (s_exact && !s_shimmer_out &&
+      prv_display_hour(t) == s_drawn_hour && t->tm_min == s_drawn_min) {
     return;  // nothing would change — don't spend a repaint
   }
   prv_log_trigger(t);
   s_exact = true;
   s_exact_hour = t->tm_hour;
   s_exact_min = t->tm_min;
+  s_shimmer_out = false;
   s_shimmer_left = SHIMMER_FRAMES;
   if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
   s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
@@ -479,33 +496,41 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   if (s_logged_hour >= 0 && day_key != 0 &&
       (s_logged_hour != tick_time->tm_hour || s_logged_day_key != day_key)) {
     bool was_quiet = (s_today.quiet_mask & (1UL << s_logged_hour)) != 0;
-    APP_LOG(APP_LOG_LEVEL_INFO, "row %02d/%02d/%04d,%02d,%s,%d",
+    APP_LOG(APP_LOG_LEVEL_INFO, "row %02d/%02d/%04d,%02d,%s,%d,%d",
             s_today.mday, s_today.mon, s_today.year, s_logged_hour,
-            was_quiet ? "yes" : "no", s_today.shakes[s_logged_hour]);
+            was_quiet ? "yes" : "no", s_today.shakes[s_logged_hour],
+            s_today.battery[s_logged_hour]);
   }
 
   // Every-minute tick doubles as the sampler for the current hour's Quiet
-  // Time flag — last sample in the hour wins, which converges to the right
-  // answer since Quiet Time windows don't flap minute to minute.
+  // Time flag and battery level — last sample in the hour wins, which converges
+  // to the right answer since neither flaps minute to minute.
   prv_ensure_today(tick_time);
   bool quiet = quiet_time_is_active();
   uint32_t bit = 1UL << tick_time->tm_hour;
   uint32_t new_mask = quiet ? (s_today.quiet_mask | bit) : (s_today.quiet_mask & ~bit);
-  if (new_mask != s_today.quiet_mask) {
+  uint8_t new_bat = battery_state_service_peek().charge_percent;
+  if (new_mask != s_today.quiet_mask ||
+      s_today.battery[tick_time->tm_hour] != new_bat) {
     s_today.quiet_mask = new_mask;
+    s_today.battery[tick_time->tm_hour] = new_bat;
     prv_persist_today();
   }
   s_logged_hour = tick_time->tm_hour;
   s_logged_day_key = prv_day_key();
 
   // A manual refresh shows the exact minute — but only that minute is true. Once
-  // the clock ticks past it, drop back to the passive static so the face stops
-  // implying a precision it no longer has. (Down to a second if you shook at
-  // :59; a near-full minute if you shook at :00 — which is the point.)
-  if (s_exact &&
+  // the clock ticks past it, play the lock-on ramp in reverse: the minute decays
+  // back into static over ~320 ms rather than cutting out in one frame. The ramp
+  // ends by clearing s_exact (prv_shimmer_tick). (Down to a second if you shook
+  // at :59; a near-full minute if you shook at :00 — which is the point.)
+  if (s_exact && !s_shimmer_out &&
       (tick_time->tm_hour != s_exact_hour || tick_time->tm_min != s_exact_min)) {
-    s_exact = false;
-    layer_mark_dirty(s_digits_layer);  // minute row: clean -> snow
+    s_shimmer_out = true;
+    s_shimmer_left = SHIMMER_FRAMES;
+    if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
+    s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
+    layer_mark_dirty(s_digits_layer);  // minute row: clean -> ramp -> snow
   }
 
   // The OS wakes the app every minute for its own clock; we only repaint on the

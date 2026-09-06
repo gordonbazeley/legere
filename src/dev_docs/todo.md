@@ -11,9 +11,13 @@ is the grill session captured in `decisions.md`.
 - [x] **Lock-on ramp instead of snow-then-clean.** Done — `prv_snow_permille()`
   steps the snowed fraction of the minute ink 1000→0 over `SHIMMER_FRAMES`, so
   the digits surface out of the noise. `prv_staticify` gained a `permille` arg.
+- [x] **Symmetric ramp on loss of lock.** Done — `s_shimmer_out` runs the same
+  ramp in reverse (0→1000) when the clock ticks past the locked minute;
+  `prv_shimmer_tick` clears `s_exact` on the last frame. Was a one-frame hard cut.
 - [ ] **Tune the lock-on ramp on hardware.** `SHIMMER_FRAMES 8` / `SHIMMER_MS 40`
   (~320 ms) is a guess. Check the feel on a real wrist — frame count, step
-  time, whether a linear permille ramp reads right or wants an ease.
+  time, whether a linear permille ramp reads right or wants an ease. Applies to
+  both directions (lock-on and lock-out share the constants).
 - [x] **Check the static on gabbro** (round, 58×62 slot). Done — verified in the
   gabbro emulator (`22:57` passive + shake-to-exact). Snow renders correctly at
   the 58×62 slot on gabbro's round 8-bit framebuffer: clean glyph outline, only
@@ -77,16 +81,20 @@ is the grill session captured in `decisions.md`.
 
 ## Instrumentation (temporary — all of this comes out at store launch)
 
-- [ ] **Add hourly battery-% to `DayRecord`.** One `uint8_t` (or min/max pair),
-  sampled on the existing hourly path in `prv_tick_handler` via
-  `battery_state_service_peek()`. Add it to the AppMessage export and the
-  `APP_LOG` "row" line + `pebble-log-to-csv.py`. Purpose: spot legere doing
-  something dumb on my own wrist. Not a grid A/B.
-- [ ] **Removal checklist for store launch:** `DayRecord` + persist ring,
-  `prv_log_trigger` / `prv_ensure_today` / `prv_persist_today` / `prv_day_key`,
-  the whole `--- Phone export ---` block, `prv_outbox_*` / `prv_inbox_received`
-  handlers, the `APP_LOG` "row" and "shake-wake" lines, `tools/pebble-log-to-csv.py`,
-  the `Year`/`Mon`/`Mday`/`Shakes`/`QuietMask`/`Done`/`RequestLog` message keys.
+- [x] **Add hourly battery-% to `DayRecord`.** Done — `battery[24]` (last member,
+  `0xFF` = no sample), sampled on the existing hourly path in `prv_tick_handler`
+  via `battery_state_service_peek().charge_percent`, folded into the quiet-mask
+  persist-on-change block. In the AppMessage export (`Battery` key), the
+  `APP_LOG` "row" line, and `pebble-log-to-csv.py` as a `battery` column
+  (integer percent — the API has no sub-integer resolution). Purpose: spot
+  legere doing something dumb on my own wrist. Not a grid A/B.
+- [ ] **Removal checklist for store launch:** `DayRecord` + persist ring
+  (incl. `battery[24]`), `prv_log_trigger` / `prv_ensure_today` /
+  `prv_persist_today` / `prv_day_key`, the whole `--- Phone export ---` block,
+  `prv_outbox_*` / `prv_inbox_received` handlers, the `APP_LOG` "row" and
+  "shake-wake" lines, `tools/pebble-log-to-csv.py`, the
+  `Year`/`Mon`/`Mday`/`Shakes`/`Battery`/`QuietMask`/`Done`/`RequestLog` message
+  keys. The `battery` CSV column in `index.js` + `open_config.js`.
   In pkjs: the log-fetch code in `src/pkjs/index.js` (back down to just the
   `showConfiguration` opener), the `#logSection` + its `<script>` in
   `settings.html` (regen `settings-html.js`), the `--log` branch in

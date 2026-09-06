@@ -21,10 +21,11 @@ if (!fs.existsSync(SETTINGS_HTML)) {
 var withLog = process.argv.indexOf('--log') !== -1;
 
 function sampleLog() {
-  var rows = ['date,hour,quiet_hour,shakes'];
+  var rows = ['date,hour,quiet_hour,shakes,battery'];
   for (var h = 0; h < 24; h++) {
     var quiet = (h < 7 || h >= 23) ? 'yes' : 'no';
-    rows.push('05/09/2026,' + (h < 10 ? '0' : '') + h + ',' + quiet + ',' + (h % 4));
+    rows.push('05/09/2026,' + (h < 10 ? '0' : '') + h + ',' + quiet + ',' + (h % 4) +
+              ',' + (100 - 3 * h));
   }
   return 'var LOG={days:1,csv:' + JSON.stringify(rows.join('\n')) + '};';
 }

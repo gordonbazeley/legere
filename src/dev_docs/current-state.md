@@ -17,8 +17,11 @@
   static when passive, resolving to solid white on a shake via a ~320 ms lock-on
   ramp — `prv_snow_permille()` steps the snowed fraction of the minute ink
   1000→0 over `SHIMMER_FRAMES` (`prv_staticify` + `s_shimmer_left` /
-  `prv_shimmer_tick`). The whole date row is a constant mid blue (`DATE_COLOR`,
-  `GColorVividCerulean`) — no red/blue freshness cue there any more.
+  `prv_shimmer_tick`). The ramp is symmetric: when the clock ticks past the
+  locked minute it plays in reverse (`s_shimmer_out`, 0→1000), so the minute
+  decays back into static rather than cutting out in one frame. The whole date
+  row is a constant mid blue (`DATE_COLOR`, `GColorVividCerulean`) — no red/blue
+  freshness cue there any more.
 - 12/24h from the system (`clock_is_24h_style`).
 - Repaint skipped whenever it would not change the screen (`s_drawn_hour` /
   `s_drawn_min`).
@@ -26,7 +29,10 @@
   marked dirty only when its own content changes. Date strings cached, rebuilt
   on `tm_mday` change only.
 - Diagnostic log: `DayRecord` ring (14 days), per-hour shake counts + Quiet Time
-  bitmask, in persist storage.
+  bitmask + battery `charge_percent` (`0xFF` = no sample), in persist storage.
+  `battery[24]` is last in the struct so pre-battery 32-byte blobs still read
+  back cleanly. CSV gains a `battery` column (integer percent, blank if no
+  sample).
 - Log export, two paths (both temporary, out at store launch):
   - **`APP_LOG` rows** in the exact CSV shape, one per *finished* hour —
     `pebble logs` capture + `tools/pebble-log-to-csv.py`. The in-progress hour
@@ -54,7 +60,6 @@
   (`prv_pick_date_font`): 21px normally, 18px only if the locale's widest
   weekday+month abbreviations wouldn't fit at 21 (FR/ES, with "SEPT." + accented
   period-weekdays). Untested on real hardware with a non-English language pack.
-- **Temporary battery-% sampling** in `DayRecord` (Q17) — not added.
 - **Store listing pass** — no store assets, description, or screenshots; the
   diagnostic instrumentation is still in.
 - **Hardware validation** of the `67ae9f5` overlap + dark-grey hour, especially

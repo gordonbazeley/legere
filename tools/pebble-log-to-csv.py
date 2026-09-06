@@ -13,11 +13,11 @@ Usage:
 import re
 import sys
 
-ROW = re.compile(r'row (\d{2}/\d{2}/\d{4},\d{2},(?:yes|no),\d+)')
+ROW = re.compile(r'row (\d{2}/\d{2}/\d{4},\d{2},(?:yes|no),\d+(?:,\d+)?)')
 
 
 def main(path):
-    print('date,hour,quiet_hour,shakes')
+    print('date,hour,quiet_hour,shakes,battery')
     with open(path) as f:
         for line in f:
             m = ROW.search(line)

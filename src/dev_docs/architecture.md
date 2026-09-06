@@ -27,7 +27,7 @@ backlight on ──┼── force an exact repaint (s_exact = true), unless not
         prv_digits_update_proc  (s_digits_layer)
           ├── hour digits  (bitmap blits, GColorDarkGray, always)
           └── minute digits(white, then prv_staticify() snows a fraction: all when
-          │                 passive, ramping to none over the lock-on)
+          │                 passive, ramping to none over the lock-on / back to all on lock-out)
         prv_date_update_proc    (s_date_layer — only marked dirty on a date rollover)
           └── date row     (weekday / day / month; whole row a constant mid blue)
 ```
@@ -78,7 +78,9 @@ foot/head collision this causes is intentional and accepted.
   solid `GColorWhite` when exact. A shake plays a lock-on *ramp* first
   (`SHIMMER_FRAMES` × `SHIMMER_MS`, ~320 ms): the snowed fraction of the minute
   ink steps down from all of it to none, so the digits emerge from the noise
-  like a tuner pulling a station in.
+  like a tuner pulling a station in. The ramp runs in reverse (`s_shimmer_out`,
+  none → all) when the exact reading expires, so the minute dissolves back into
+  static rather than cutting out in one frame.
 - **Hour row**: always solid `GColorDarkGray`, never flickers — the hour is
   always exact, so signalling anything on it would be a lie.
 - **Date row**: whole line a constant mid blue (`DATE_COLOR`,
@@ -94,9 +96,12 @@ fully-opaque white pixel in the minute-row rect, with probability `permille`/100
 replaces it with a random entry from `SNOW[]` (white → light grey → dark grey →
 black — a real dropout spread, not just greys, so it reads on the unlit
 reflective LCD). Anti-aliased edge pixels (not pure white) are left, so the
-glyph keeps a clean outline. `permille` comes from `prv_snow_permille()`: 1000
-while passive, and `s_shimmer_left / SHIMMER_FRAMES × 1000` during the ramp
-(`s_shimmer_left` is an `AppTimer` countdown set by `prv_refresh_to_exact`).
+glyph keeps a clean outline. `permille` comes from `prv_snow_permille()`: while a
+ramp is in flight it wins over `s_exact` — lock-on steps `SHIMMER_FRAMES → 0` as
+`1000 → 0`, lock-out (`s_shimmer_out`) steps it `0 → 1000`; otherwise 1000 when
+passive, 0 when exact. `s_shimmer_left` is an `AppTimer` countdown started by
+`prv_refresh_to_exact` (lock-on) or `prv_tick_handler` (lock-out); the lock-out
+ramp's final `prv_shimmer_tick` clears `s_exact`.
 
 ## Time model
 
@@ -106,11 +111,11 @@ while passive, and `s_shimmer_left / SHIMMER_FRAMES × 1000` during the ramp
   shake/tap/backlight-forced one. Drives the minute static only (whether
   `prv_staticify` runs, and at what density during the ramp).
 - `s_exact_hour` / `s_exact_min` — the wall-clock minute a forced-exact repaint
-  locked onto. `prv_tick_handler` clears `s_exact` the first tick the clock
-  reads a different minute, so an exact reading lasts at most to the end of its
-  own minute (a second if you shook at `:59`, nearly a minute if at `:00`) —
-  then the face falls back to the passive static, since the shown digits are
-  now stale.
+  locked onto. The first tick the clock reads a different minute, `prv_tick_handler`
+  starts the reverse ramp (`s_shimmer_out`); `s_exact` clears on its last frame.
+  So an exact reading lasts at most to the end of its own minute (a second if you
+  shook at `:59`, nearly a minute if at `:00`) plus the ~320 ms ramp-out — then
+  the face is back to passive static, since the shown digits are now stale.
 - `s_drawn_hour` / `s_drawn_min` — what the last repaint actually put on screen,
   so a refresh that would change nothing skips the redraw entirely.
 
@@ -133,7 +138,7 @@ Forced-exact paths:
 - Both funnel through `prv_refresh_to_exact()`, which no-ops if the exact time is
   already on screen — this is what stops a walk from repainting every stride.
   (An exact reading now expires at the next minute tick, so during a walk the
-  face cycles static → lock-on ramp → clean → static about once a minute rather
+  face cycles static → lock-on ramp → clean → lock-out ramp → static about once a minute rather
   than sitting clean between grid ticks.)
 
 ## Power model
@@ -185,8 +190,12 @@ of it is legere-specific; it applies to any minimal watchface.
 
 ## Diagnostic log (temporary)
 
-A `DayRecord` ring buffer (`DAYS_KEPT = 14`, 32 B/day in persist storage) records
-per-hour shake-trigger counts and a Quiet Time bitmask. Two export paths:
+A `DayRecord` ring buffer (`DAYS_KEPT = 14`, 56 B/day in persist storage) records
+per-hour shake-trigger counts, a Quiet Time bitmask, and per-hour battery
+`charge_percent` (`battery[24]`, `0xFF` = no sample; last member so pre-battery
+32 B blobs still read back cleanly). Battery is sampled on the same hourly path
+as the Quiet Time flag. CSV columns: `date,hour,quiet_hour,shakes,battery`
+(battery integer percent, blank if unsampled). Two export paths:
 
 - **`APP_LOG` rows** in the exact CSV shape, emitted **only when an hour
   finishes** (the first tick of the next hour, `prv_tick_handler`). The
@@ -202,10 +211,9 @@ per-hour shake-trigger counts and a Quiet Time bitmask. Two export paths:
 Note both paths read persist storage, which `pebble install` **wipes** — after a
 reinstall there is no history, only what has accrued since.
 
-Q17 (grill): a temporary hourly **battery-%** sample is to be added to
-`DayRecord` while the face is being finished — to catch legere doing something
-dumb, not to justify the grid. **All of this instrumentation comes out at store
-launch.**
+Q17 (grill): the temporary hourly **battery-%** sample (above) is there to catch
+legere doing something dumb while the face is being finished, not to justify the
+grid. **All of this instrumentation comes out at store launch.**
 
 ## Platforms
 

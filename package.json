@@ -27,6 +27,7 @@
       "Mon",
       "Mday",
       "Shakes",
+      "Battery",
       "QuietMask",
       "Done"
     ],

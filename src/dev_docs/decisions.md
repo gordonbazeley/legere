@@ -44,8 +44,10 @@ with random `SNOW[]` "snow" (white → black) — a dead-channel look — instea
 solid ink. A shake resolves them with a lock-on ramp: `SHIMMER_FRAMES` redraws
 `SHIMMER_MS` apart, each snowing a smaller fraction of the ink
 (`prv_snow_permille()` 1000→0), so the digits surface out of the noise; the last
-frame is clean white. The hour row is always solid `GColorDarkGray` and never
-flickers. The date row does **not** carry a freshness cue — whole line is a
+frame is clean white. The ramp is symmetric — when the exact reading expires it
+plays in reverse (`s_shimmer_out`, 0→1000) so the minute dissolves back into
+static instead of a one-frame cut. The hour row is always solid `GColorDarkGray`
+and never flickers. The date row does **not** carry a freshness cue — whole line is a
 constant mid blue (`DATE_COLOR` = `GColorVividCerulean`).
 
 **Why:** An early version put the freshness cue on the month colour (blue
@@ -78,12 +80,13 @@ the effect to the 8-bit colour format (fine for emery + gabbro).
 **Exact reading expires at the next minute tick** (`s_exact_hour`/`s_exact_min`
 in `prv_tick_handler`), not at the next 5-minute grid tick. A shake shows the
 true minute; the moment the clock rolls past it the digits are stale, so the
-face returns to the static then rather than holding a clean-but-wrong reading
-for up to 5 minutes (up to ~59 in Quiet Time). Costs one extra layer repaint
-per manual refresh, a minute later — the OS already wakes the app every minute,
-so no extra wake. During a walk the tap path now cycles static → ramp → clean →
-static roughly once a minute instead of sitting clean between grid ticks;
-accepted (the reading genuinely is only fresh right after the tap).
+face returns to the static then (via the reverse ramp) rather than holding a
+clean-but-wrong reading for up to 5 minutes (up to ~59 in Quiet Time). Costs one
+extra `SHIMMER_FRAMES` burst per manual refresh, a minute later — the OS already
+wakes the app every minute, so no extra wake. During a walk the tap path now
+cycles static → ramp → clean → ramp → static roughly once a minute instead of
+sitting clean between grid ticks; accepted (the reading genuinely is only fresh
+right after the tap).
 
 **Rejected:** grey-vs-white minute brightness (too subtle); blue minutes (makes
 colour do double duty with the month); trailing `~`/`+` glyph (needs a sprite,
@@ -164,14 +167,16 @@ Untested with a real non-English language pack — the emulator can't install on
 
 **Chose:** The `DayRecord` ring buffer, AppMessage export, `pebble-log-to-csv.py`,
 and the `APP_LOG` "row"/"shake-wake" lines all get removed at store launch. A
-temporary hourly battery-% sample is added to `DayRecord` in the meantime.
+temporary hourly battery-% sample (`DayRecord.battery[24]`, integer percent,
+`0xFF` = no sample) is in `DayRecord` in the meantime, surfaced as the CSV
+`battery` column.
 
 **Why:** With the grid reframed as identity (not power), the log has nothing left
 to prove. It stays only as a "is legere doing something dumb on my own wrist"
 check while the face is finished.
 
 **Trade-off:** Message keys (`RequestLog`, `Year`, `Mon`, `Mday`, `Shakes`,
-`QuietMask`, `Done`) and the `configurable` capability come back out of
+`Battery`, `QuietMask`, `Done`) and the `configurable` capability come back out of
 `package.json` when the export goes — unless the ko-fi settings page keeps a
 companion around, in which case the export code goes but the plumbing stays.
 

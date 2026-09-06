@@ -18,7 +18,7 @@ var timeoutId = null;
 function openPage() {
   clearTimeout(timeoutId);
 
-  var rows = ['date,hour,quiet_hour,shakes'];
+  var rows = ['date,hour,quiet_hour,shakes,battery'];
   days.sort(function (a, b) {
     return (a.year - b.year) || (a.mon - b.mon) || (a.mday - b.mday);
   });
@@ -26,7 +26,9 @@ function openPage() {
     var date = pad2(d.mday) + '/' + pad2(d.mon) + '/' + d.year;
     for (var h = 0; h < 24; h++) {
       var quiet = (d.quietMask & (1 << h)) ? 'yes' : 'no';
-      rows.push(date + ',' + pad2(h) + ',' + quiet + ',' + d.shakes[h]);
+      var bat = d.battery[h];
+      rows.push(date + ',' + pad2(h) + ',' + quiet + ',' + d.shakes[h] + ',' +
+                (bat === 255 ? '' : bat));
     }
   });
 
@@ -62,6 +64,7 @@ Pebble.addEventListener('appmessage', function (e) {
       mon: d.Mon,
       mday: d.Mday,
       shakes: d.Shakes,       // 24-byte array, one count per hour
+      battery: d.Battery,     // 24-byte array, charge_percent per hour; 255 = no sample
       quietMask: d.QuietMask >>> 0
     });
   }
