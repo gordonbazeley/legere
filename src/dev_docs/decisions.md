@@ -40,31 +40,50 @@ Acceptable; the estimate is enough.
 ## Passive minutes render as TV static ("no signal")
 
 **Chose:** When the reading is passive (floored), the minute digits are filled
-with random `GColorLightGray`/`GColorWhite` "snow" — a dead-channel look — instead
-of solid ink. A shake resolves them: a short lock-on flicker (`SHIMMER_FRAMES`
-redraws of fresh snow, `SHIMMER_MS` apart) then the clean white exact time. The
-hour row is always solid `GColorDarkGray` and never flickers. Month colour is
-unchanged (blue passive / red exact).
+with random `SNOW[]` "snow" (white → black) — a dead-channel look — instead of
+solid ink. A shake resolves them with a lock-on ramp: `SHIMMER_FRAMES` redraws
+`SHIMMER_MS` apart, each snowing a smaller fraction of the ink
+(`prv_snow_permille()` 1000→0), so the digits surface out of the noise; the last
+frame is clean white. The hour row is always solid `GColorDarkGray` and never
+flickers. The date row does **not** carry a freshness cue — whole line is a
+constant mid blue (`DATE_COLOR` = `GColorVividCerulean`).
 
-**Why:** The month colour alone is a tiny corner cue a stranger won't decode.
-An earlier plan (grey minutes → white minutes) was too subtle glancing at the
-face in isolation. Static is unmistakable — "this signal isn't locked in" reads
-instantly, and the shake→lock-on gives the interaction a satisfying payoff. The
-hour is genuinely always exact, so it stays solid.
+**Why:** An early version put the freshness cue on the month colour (blue
+passive / red exact). Dropped: it's a tiny corner cue a stranger won't decode,
+and the static already says it unmistakably — "this signal isn't locked in"
+reads instantly, and the shake→lock-on gives the interaction a satisfying
+payoff. An earlier plan (grey minutes → white minutes) was too subtle glancing
+at the face in isolation. The hour is genuinely always exact, so it stays solid.
+Colouring the whole date row (not just white text) also just reads better on
+the unlit transflective LCD, where the old white day-of-month was faint.
 
-**How:** `prv_staticify()` works at the framebuffer level
+**How:** `prv_staticify(ctx, rect, permille)` works at the framebuffer level
 (`graphics_capture_frame_buffer`) — the minute glyphs are drawn solid white,
-then every fully-opaque white pixel inside the minute-row rect is replaced with a
-random grey. The anti-aliased glyph edges (not pure white) are left alone, so the
-digit keeps a clean outline around the noise. ~19k pixel writes per passive
-redraw — negligible at the 5-minute cadence; the lock-on adds `SHIMMER_FRAMES`
-redraws on an explicit shake, also negligible.
+then each fully-opaque white pixel inside the minute-row rect is, with
+probability `permille`/1000, replaced by a random `SNOW[]` entry (white → light
+grey → dark grey → black — a real dropout spread, not just greys, so it carries
+on the unlit reflective LCD). The anti-aliased glyph edges (not pure white) are
+left alone, so the digit keeps a clean outline around the noise. `permille` is
+1000 while passive; the lock-on ramp (`prv_snow_permille()`, `SHIMMER_FRAMES`
+redraws) steps it 1000→0 so the digits emerge from the noise. ~19k pixel writes
+per passive redraw — negligible at the 5-minute cadence; the ramp is a one-shot
+burst on an explicit shake.
 
 **Trade-off:** Static is visually *agitated* — arguably against the "calm"
 identity. Accepted deliberately (user asked for it); the snow is frozen between
 5-minute repaints (re-randomised only when the clock ticks the grid or during a
 lock-on), so it doesn't literally flicker at rest. The framebuffer approach ties
 the effect to the 8-bit colour format (fine for emery + gabbro).
+
+**Exact reading expires at the next minute tick** (`s_exact_hour`/`s_exact_min`
+in `prv_tick_handler`), not at the next 5-minute grid tick. A shake shows the
+true minute; the moment the clock rolls past it the digits are stale, so the
+face returns to the static then rather than holding a clean-but-wrong reading
+for up to 5 minutes (up to ~59 in Quiet Time). Costs one extra layer repaint
+per manual refresh, a minute later — the OS already wakes the app every minute,
+so no extra wake. During a walk the tap path now cycles static → ramp → clean →
+static roughly once a minute instead of sitting clean between grid ticks;
+accepted (the reading genuinely is only fresh right after the tap).
 
 **Rejected:** grey-vs-white minute brightness (too subtle); blue minutes (makes
 colour do double duty with the month); trailing `~`/`+` glyph (needs a sprite,

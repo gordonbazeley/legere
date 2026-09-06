@@ -13,10 +13,12 @@
   repaint; `prv_refresh_to_exact` no-ops if the exact time is already shown.
 - Quiet Time suppresses the tap path; the backlight path stays live but skips a
   repaint that already landed this minute.
-- Freshness signal: month `GColorElectricBlue` when passive, `GColorRed` when
-  exact; **minute digits rendered as TV static when passive**, resolving to
-  solid white on a shake after a ~275 ms lock-on flicker (`prv_staticify` +
-  `s_shimmer_left` / `prv_shimmer_tick`).
+- Freshness signal is **the minute static alone**: minute digits rendered as TV
+  static when passive, resolving to solid white on a shake via a ~320 ms lock-on
+  ramp — `prv_snow_permille()` steps the snowed fraction of the minute ink
+  1000→0 over `SHIMMER_FRAMES` (`prv_staticify` + `s_shimmer_left` /
+  `prv_shimmer_tick`). The whole date row is a constant mid blue (`DATE_COLOR`,
+  `GColorVividCerulean`) — no red/blue freshness cue there any more.
 - 12/24h from the system (`clock_is_24h_style`).
 - Repaint skipped whenever it would not change the screen (`s_drawn_hour` /
   `s_drawn_min`).
@@ -25,14 +27,18 @@
   on `tm_mday` change only.
 - Diagnostic log: `DayRecord` ring (14 days), per-hour shake counts + Quiet Time
   bitmask, in persist storage.
-- Log export: `APP_LOG` rows in the exact CSV shape, one per finished hour, for
-  `pebble logs` capture + `tools/pebble-log-to-csv.py`. (The old AppMessage →
-  pkjs → Web Share path is gone; the companion now only serves the settings
-  page. The watch-side `RequestLog` / `prv_outbox_*` handlers are still in
-  `legere.c`, now unreachable — on the removal checklist in `todo.md`.)
+- Log export, two paths (both temporary, out at store launch):
+  - **`APP_LOG` rows** in the exact CSV shape, one per *finished* hour —
+    `pebble logs` capture + `tools/pebble-log-to-csv.py`. The in-progress hour
+    is never logged; earlier hours only appear if capture was running at each
+    hour boundary.
+  - **AppMessage** → `src/pkjs/index.js` → the settings page's "Diagnostic
+    log" section (CSV + Web Share / textarea). Sends every persisted
+    `DayRecord` slot including today's partial one.
 - Companion settings page (`src/pkjs/settings.html`, generated string in
-  `settings-html.js`): info + GitHub issues + ko-fi link. No configurable
-  settings. Preview with `node src/open_config.js`.
+  `settings-html.js`): a temporary diagnostic-log section (above), then info +
+  GitHub issues + ko-fi link. No configurable settings. Preview with
+  `node src/open_config.js` (`--log` for sample rows).
 - Launcher icon (`resources/images/icon.png`) reads on any launcher background
   (white glyph + black keyline).
 - Builds via `pebble build`; `tools/strip-js-sourcemap.sh` drops the unused
@@ -63,11 +69,11 @@
 - **Overlap digit collision.** ~30–40% of times have the hour digit's foot
   overpainted by the minute digit's head (e.g. `22:57`). Intentional; grey/white
   contrast carries it, but it's the main thing to sanity-check on hardware.
-- **`configurable` capability stays** — it now backs the settings/ko-fi page.
-  The AppMessage message keys (`RequestLog` etc.) and the watch-side
-  `RequestLog` / `prv_outbox_*` handlers are load-bearing for nothing now
-  (pkjs stopped requesting the log) — remove them with the rest of the
-  diagnostic instrumentation at store launch.
+- **`configurable` capability stays** — it backs the settings/ko-fi page. The
+  AppMessage export (message keys, `prv_outbox_*` / `prv_inbox_received`) is
+  still wired to the settings page's diagnostic-log section — that all comes
+  out together at store launch, leaving `index.js` as just the
+  `showConfiguration` → settings-page opener.
 - **`prv_measure` uses a fixed 400×300 layout box.** Fine for the short strings
   used, but it is a text-layout call — keep it out of any redraw path (currently
   only `prv_window_load` calls it).
@@ -94,10 +100,10 @@
 | File | Role |
 |---|---|
 | `src/c/legere.c` | Entire watch app (~490 lines) |
-| `src/pkjs/index.js` | Phone companion: opens the settings page on `showConfiguration` (~12 lines) |
-| `src/pkjs/settings.html` | Companion settings page — info + GitHub issues + ko-fi link (editable source) |
+| `src/pkjs/index.js` | Phone companion: pulls the log over AppMessage (temporary) + opens the settings page on `showConfiguration` |
+| `src/pkjs/settings.html` | Companion settings page — temporary diagnostic-log section, then info + GitHub issues + ko-fi link (editable source) |
 | `src/pkjs/settings-html.js` | Generated CommonJS string of `settings.html`, loaded by pkjs — regen after editing the HTML |
-| `src/open_config.js` | Dev helper: serves `settings.html` on localhost for browser preview |
+| `src/open_config.js` | Dev helper: serves `settings.html` on localhost for browser preview (`--log` injects sample rows) |
 | `package.json` | Pebble metadata, message keys, resources |
 | `wscript` | SDK build rules (unmodified) |
 | `resources/fonts/AlfaSlabOne-Regular.ttf` | Source for the digit sprite sheets |

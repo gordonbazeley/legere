@@ -7,18 +7,25 @@
 static Window *s_window;
 // Two disjoint sibling layers so a repaint of one never re-runs the other's
 // update proc: the time digits change on every passive/forced repaint, the date
-// row only on a rollover or an s_exact flip.
+// row only on a date rollover.
 static Layer *s_digits_layer;
 static Layer *s_date_layer;
 
-// true  = a wrist shake forced an exact reading -> month drawn red
-// false = the minute is floored to a multiple of 5 (passive) -> month drawn blue
+// true  = a wrist shake forced an exact reading (minute digits clean)
+// false = the minute is floored to a multiple of 5 (passive, minute digits snow)
 static bool s_exact = false;
 
 // Date line: Michroma. Glyph subset in package.json covers A-Z, digits, space,
 // '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL.
 static GFont s_date_font;
 static bool s_date_font_custom;
+
+// Whole date line is drawn in this one colour (no freshness signal on the date
+// row any more — only the minute static carries that). A mid blue: bright enough
+// to read on the unlit transflective LCD, but blue rather than the cyan of
+// GColorElectricBlue. HW-tune: GColorBlueMoon is one step deeper if this washes
+// out, GColorElectricBlue one step lighter if it's too dim.
+#define DATE_COLOR GColorVividCerulean
 
 // The hour/minute digits are pre-rendered bitmaps (a font can't be rasterised
 // big enough on-watch). One sprite sheet of 10 fixed-width slots, sliced into
@@ -34,12 +41,23 @@ static int s_drawn_hour = -1;
 static int s_drawn_min = -1;
 
 // Passive minutes are drawn as TV-static "snow" (see prv_staticify). A shake
-// resolves them to a clean signal — but first runs a short "locking on" flicker:
-// SHIMMER_FRAMES redraws of fresh snow, SHIMMER_MS apart, then the clean render.
-#define SHIMMER_FRAMES 5
-#define SHIMMER_MS 55
-static int s_shimmer_left = 0;         // >0 while the lock-on flicker is playing
+// resolves them to a clean signal — but first runs a short "locking on" ramp:
+// SHIMMER_FRAMES redraws SHIMMER_MS apart, each snowing a smaller fraction of
+// the minute ink than the last, so the digits surface out of the noise like a
+// tuner pulling a station in. The frame that lands on 0 is the clean render.
+// HW-tune this (feel of the lock-on) alongside the values themselves.
+#define SHIMMER_FRAMES 8
+#define SHIMMER_MS 40
+static int s_shimmer_left = 0;         // frames remaining in the lock-on ramp (SHIMMER_FRAMES..0)
 static AppTimer *s_shimmer_timer = NULL;
+
+// Snow density for the current frame, in permille of the minute-ink pixels:
+// 1000 = every pixel (passive / no signal), 0 = clean. During the lock-on ramp
+// it steps down SHIMMER_FRAMES..0 -> 1000..0.
+static int prv_snow_permille(void) {
+  if (!s_exact) return 1000;
+  return s_shimmer_left * 1000 / SHIMMER_FRAMES;
+}
 
 static int s_digit_band_top; // top y of the digit grid
 static int s_date_top;       // y of the date row
@@ -180,9 +198,9 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
   }
 }
 
-// One frame of the lock-on flicker: count down and repaint. While s_shimmer_left
-// is > 0 the minutes still render as snow (freshly randomised each frame); the
-// frame that lands on 0 renders the clean exact time.
+// One frame of the lock-on ramp: count down and repaint. prv_snow_permille()
+// reads s_shimmer_left, so each frame snows less of the minute ink than the
+// last (freshly randomised); the frame that lands on 0 renders it clean.
 static void prv_shimmer_tick(void *context) {
   s_shimmer_timer = NULL;
   if (s_shimmer_left > 0) s_shimmer_left--;
@@ -192,7 +210,12 @@ static void prv_shimmer_tick(void *context) {
   }
 }
 
-// Refresh to the exact minute (and flag it red) unless that's already on screen.
+// Wall-clock minute a manual refresh locked onto — the exact reading is only
+// truthful until the clock ticks past it (see prv_tick_handler). -1 = none.
+static int s_exact_hour = -1;
+static int s_exact_min = -1;
+
+// Refresh the minute row to the exact time unless it's already on screen.
 static void prv_refresh_to_exact(void) {
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
@@ -201,11 +224,12 @@ static void prv_refresh_to_exact(void) {
   }
   prv_log_trigger(t);
   s_exact = true;
+  s_exact_hour = t->tm_hour;
+  s_exact_min = t->tm_min;
   s_shimmer_left = SHIMMER_FRAMES;
   if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
   s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
-  layer_mark_dirty(s_digits_layer);  // minute row: snow -> clean
-  layer_mark_dirty(s_date_layer);    // month colour: blue -> red
+  layer_mark_dirty(s_digits_layer);  // minute row: snow -> clean (date row is unaffected now)
 }
 
 // Recolour a digit by poking the sheet's palette — tint every visible palette
@@ -246,7 +270,12 @@ static const uint8_t SNOW[4] = {
 // level so it needs no offscreen bitmap: only fully-opaque white pixels (the
 // glyph interiors, drawn white just above) are touched, so the anti-aliased
 // glyph edges survive as a clean outline around the noise.
-static void prv_staticify(GContext *ctx, GRect r) {
+//
+// `permille` (1..1000) is the fraction of ink pixels replaced this frame; the
+// rest stay clean white. The lock-on ramp steps it down so the digits emerge
+// from the noise. ponytail: two rand() calls per snowed pixel (gate + palette)
+// vs one before — only on the shake path, a one-shot ~320 ms burst, not hot.
+static void prv_staticify(GContext *ctx, GRect r, int permille) {
   GBitmap *fb = graphics_capture_frame_buffer(ctx);
   if (!fb) return;
   GRect b = gbitmap_get_bounds(fb);
@@ -258,7 +287,8 @@ static void prv_staticify(GContext *ctx, GRect r) {
     int x1 = r.origin.x + r.size.w;
     if (x1 > ri.max_x + 1) x1 = ri.max_x + 1;
     for (int x = x0; x < x1; x++) {
-      if (ri.data[x] == GColorWhiteARGB8) {
+      if (ri.data[x] == GColorWhiteARGB8 &&
+          (permille >= 1000 || (rand() % 1000) < permille)) {
         ri.data[x] = SNOW[rand() & 3];
       }
     }
@@ -353,9 +383,10 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   // usable width and the rows keep a normal positive gap.
   //
   // The minute row is drawn solid white, then (when the reading is passive, or
-  // mid lock-on flicker) prv_staticify() turns that white ink into snow. The
-  // hour is always exact, so it stays a solid dark grey and never flickers.
-  bool minutes_snow = !s_exact || s_shimmer_left > 0;
+  // mid lock-on ramp) prv_staticify() replaces that white ink with snow — all of
+  // it when passive, a shrinking fraction over the ramp. The hour is always
+  // exact, so it stays a solid dark grey and never flickers.
+  int snow_permille = prv_snow_permille();
   if (s_sheet) {
     int grid_w = s_usable_w;
     int grid_x = s_pad;
@@ -379,7 +410,7 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
                                      GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h));
       }
     }
-    if (minutes_snow) prv_staticify(ctx, min_rect);
+    if (snow_permille > 0) prv_staticify(ctx, min_rect, snow_permille);
   } else {
     // Resource-load failure only: fall back to plain text.
     char hour_str[4], min_str[4];
@@ -398,10 +429,8 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
 
 // Date row: weekday left, day-of-month centre, month right — three L/C/R strings
 // over one shared box (Michroma is too wide to force equal thirds and stay
-// legible). Month colour signals freshness: red = exact (just refreshed), blue =
-// passive 5-minute reading. Bright blue: darker blues are unreadable on the
-// transflective LCD unlit. The box is layer-relative (y = 0): s_date_layer is
-// framed at s_date_top.
+// legible). Whole row is DATE_COLOR — a constant mid blue, no freshness signal
+// here. The box is layer-relative (y = 0): s_date_layer is framed at s_date_top.
 static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
@@ -415,12 +444,11 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
     s_str_mday = t->tm_mday;
   }
 
-  GColor mon_color = s_exact ? GColorRed : GColorElectricBlue;
   int date_w = PBL_IF_ROUND_ELSE(174, s_usable_w);  // round: narrower than usable so the row clears the arc
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
-  prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, GColorWhite);
-  prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, GColorWhite);
-  prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, mon_color);
+  prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, DATE_COLOR);
+  prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, DATE_COLOR);
+  prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, DATE_COLOR);
 }
 
 // ponytail stopgap: the official Pebble app doesn't surface a Settings
@@ -470,20 +498,28 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   s_logged_hour = tick_time->tm_hour;
   s_logged_day_key = prv_day_key();
 
+  // A manual refresh shows the exact minute — but only that minute is true. Once
+  // the clock ticks past it, drop back to the passive static so the face stops
+  // implying a precision it no longer has. (Down to a second if you shook at
+  // :59; a near-full minute if you shook at :00 — which is the point.)
+  if (s_exact &&
+      (tick_time->tm_hour != s_exact_hour || tick_time->tm_min != s_exact_min)) {
+    s_exact = false;
+    layer_mark_dirty(s_digits_layer);  // minute row: clean -> snow
+  }
+
   // The OS wakes the app every minute for its own clock; we only repaint on the
   // 5-minute grid — and just hourly while the user's Quiet Time is on (asleep or
   // in a meeting). :00 and midnight are multiples of both, so hour and date
   // rollover stay covered.
   int step = quiet ? 60 : 5;
   if (tick_time->tm_min % step == 0) {
-    bool was_exact = s_exact;
     s_exact = false;
     s_sched_hour = tick_time->tm_hour;
     s_sched_min = tick_time->tm_min;
     layer_mark_dirty(s_digits_layer);
-    // Date row only moves on a rollover (new mday) or when a prior shake's
-    // exact reading expires here (month red -> blue).
-    if (was_exact || tick_time->tm_mday != s_str_mday) {
+    // Date row only moves on a date rollover — its colour is constant now.
+    if (tick_time->tm_mday != s_str_mday) {
       layer_mark_dirty(s_date_layer);
     }
   }

@@ -6,11 +6,14 @@ is the grill session captured in `decisions.md`.
 ## Face work
 
 - [x] **Passive-minute freshness signal.** Done — TV static via `prv_staticify`
-  (framebuffer snow), plus a ~275 ms lock-on flicker on shake
+  (framebuffer snow), plus a lock-on ramp on shake
   (`s_shimmer_left` / `prv_shimmer_tick`). See `decisions.md`.
-- [ ] **Tune the shimmer on hardware.** `SHIMMER_FRAMES 5` / `SHIMMER_MS 55` is a
-  guess. Check the lock-on feel on a real wrist — may want longer/shorter, or a
-  brightness ramp rather than pure snow-then-clean.
+- [x] **Lock-on ramp instead of snow-then-clean.** Done — `prv_snow_permille()`
+  steps the snowed fraction of the minute ink 1000→0 over `SHIMMER_FRAMES`, so
+  the digits surface out of the noise. `prv_staticify` gained a `permille` arg.
+- [ ] **Tune the lock-on ramp on hardware.** `SHIMMER_FRAMES 8` / `SHIMMER_MS 40`
+  (~320 ms) is a guess. Check the feel on a real wrist — frame count, step
+  time, whether a linear permille ramp reads right or wants an ease.
 - [x] **Check the static on gabbro** (round, 58×62 slot). Done — verified in the
   gabbro emulator (`22:57` passive + shake-to-exact). Snow renders correctly at
   the 58×62 slot on gabbro's round 8-bit framebuffer: clean glyph outline, only
@@ -84,16 +87,19 @@ is the grill session captured in `decisions.md`.
   the whole `--- Phone export ---` block, `prv_outbox_*` / `prv_inbox_received`
   handlers, the `APP_LOG` "row" and "shake-wake" lines, `tools/pebble-log-to-csv.py`,
   the `Year`/`Mon`/`Mday`/`Shakes`/`QuietMask`/`Done`/`RequestLog` message keys.
-  `src/pkjs/index.js` + the `configurable` capability **stay** — they now serve
-  the settings/ko-fi page. `index.js` is already down to the `showConfiguration`
-  handler; the pkjs CSV-export code is gone.
+  In pkjs: the log-fetch code in `src/pkjs/index.js` (back down to just the
+  `showConfiguration` opener), the `#logSection` + its `<script>` in
+  `settings.html` (regen `settings-html.js`), the `--log` branch in
+  `open_config.js`. **Keep** `src/pkjs/index.js` (the opener), `settings.html`,
+  and the `configurable` capability — they serve the ko-fi page.
 
 ## Store v1
 
 - [x] **ko-fi link in the settings page.** Done — `src/pkjs/settings.html`
   (editable source) + generated `settings-html.js` wrapper + `src/open_config.js`
-  dev helper, same pattern as `~/src/tidepebble`. Static info page: tagline,
-  GitHub issues link, ko-fi button. `showConfiguration` opens it as a data: URI.
+  dev helper, same pattern as `~/src/tidepebble`. Page: temporary diagnostic-log
+  section (CSV + Share, injected by `index.js`), then tagline, GitHub issues
+  link, ko-fi button. `showConfiguration` opens it as a data: URI.
 - [ ] **Listing pass.** Store assets (icon sizes, banner, screenshots),
   description copy. Pull the battery guidance from `architecture.md` → "Battery
   guidance (for the store listing)" into the description.

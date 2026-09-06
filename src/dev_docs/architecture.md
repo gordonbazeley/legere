@@ -18,6 +18,7 @@ Single-file watch app. The phone companion is just a static settings page
 ```
 tick (every minute, from the OS)
   ├── advance the day-record ring, sample Quiet Time flag
+  ├── if a forced-exact reading's minute has ticked over: clear s_exact, repaint
   ├── on the 5-minute grid (hourly during Quiet Time): mark dirty, passive repaint
   │
 shake / tap  ──┐
@@ -25,9 +26,10 @@ backlight on ──┼── force an exact repaint (s_exact = true), unless not
                │
         prv_digits_update_proc  (s_digits_layer)
           ├── hour digits  (bitmap blits, GColorDarkGray, always)
-          └── minute digits(bitmap blits, LightGray when passive / White when exact)
-        prv_date_update_proc    (s_date_layer — only marked dirty on rollover / s_exact flip)
-          └── date row     (weekday / day / month; month blue=passive, red=exact)
+          └── minute digits(white, then prv_staticify() snows a fraction: all when
+          │                 passive, ramping to none over the lock-on)
+        prv_date_update_proc    (s_date_layer — only marked dirty on a date rollover)
+          └── date row     (weekday / day / month; whole row a constant mid blue)
 ```
 
 ## Rendering
@@ -70,32 +72,45 @@ can be regenerated ~10% larger in the same vertical budget. The hour row is
 minute ink reads as clearly "in front". Committed in `67ae9f5`. The digit
 foot/head collision this causes is intentional and accepted.
 
-### Two freshness signals: month colour + minute static
+### One freshness signal: the minute static
 
-- **Month colour**: `GColorElectricBlue` when the reading is passive (floored),
-  `GColorRed` when it was just refreshed to the exact minute.
 - **Minute digits**: rendered as TV-static "snow" while passive, resolving to
-  solid `GColorWhite` when exact. A shake plays a short lock-on flicker first
-  (`SHIMMER_FRAMES` × `SHIMMER_MS`, ~275 ms) — fresh snow each frame, then clean.
+  solid `GColorWhite` when exact. A shake plays a lock-on *ramp* first
+  (`SHIMMER_FRAMES` × `SHIMMER_MS`, ~320 ms): the snowed fraction of the minute
+  ink steps down from all of it to none, so the digits emerge from the noise
+  like a tuner pulling a station in.
 - **Hour row**: always solid `GColorDarkGray`, never flickers — the hour is
   always exact, so signalling anything on it would be a lie.
+- **Date row**: whole line a constant mid blue (`DATE_COLOR`,
+  `GColorVividCerulean`). It used to carry a red/blue freshness cue on the month;
+  dropped — the static already says it, and a mid blue reads on the unlit LCD
+  where the old white day-of-month barely did.
 
 Hour/minute digits are tinted by `prv_set_ink()` poking the sprite sheet's
-palette in-place before each blit. The static is `prv_staticify()`: after the
-minute glyphs are drawn solid white, it captures the framebuffer
-(`graphics_capture_frame_buffer`, emery/gabbro 8-bit) and replaces every
-fully-opaque white pixel in the minute-row rect with a random
-`GColorLightGray`/`GColorWhite`. Anti-aliased edge pixels (not pure white) are
-left, so the glyph keeps a clean outline. `s_shimmer_left` (an `AppTimer`
-countdown set by `prv_refresh_to_exact`) keeps the minutes in snow for the first
-few frames after a shake, then the frame that lands on zero renders clean.
+palette in-place before each blit. The static is `prv_staticify(ctx, rect,
+permille)`: after the minute glyphs are drawn solid white, it captures the
+framebuffer (`graphics_capture_frame_buffer`, emery/gabbro 8-bit) and, for each
+fully-opaque white pixel in the minute-row rect, with probability `permille`/1000
+replaces it with a random entry from `SNOW[]` (white → light grey → dark grey →
+black — a real dropout spread, not just greys, so it reads on the unlit
+reflective LCD). Anti-aliased edge pixels (not pure white) are left, so the
+glyph keeps a clean outline. `permille` comes from `prv_snow_permille()`: 1000
+while passive, and `s_shimmer_left / SHIMMER_FRAMES × 1000` during the ramp
+(`s_shimmer_left` is an `AppTimer` countdown set by `prv_refresh_to_exact`).
 
 ## Time model
 
 - `prv_display_hour()` — 12/24h from `clock_is_24h_style()` (system preference).
 - `prv_floor5()` — minutes floored to a multiple of 5 for the passive display.
 - `s_exact` — `false` after a scheduled passive repaint, `true` after a
-  shake/tap/backlight-forced one. Drives the minute brightness and month colour.
+  shake/tap/backlight-forced one. Drives the minute static only (whether
+  `prv_staticify` runs, and at what density during the ramp).
+- `s_exact_hour` / `s_exact_min` — the wall-clock minute a forced-exact repaint
+  locked onto. `prv_tick_handler` clears `s_exact` the first tick the clock
+  reads a different minute, so an exact reading lasts at most to the end of its
+  own minute (a second if you shook at `:59`, nearly a minute if at `:00`) —
+  then the face falls back to the passive static, since the shown digits are
+  now stale.
 - `s_drawn_hour` / `s_drawn_min` — what the last repaint actually put on screen,
   so a refresh that would change nothing skips the redraw entirely.
 
@@ -117,6 +132,9 @@ Forced-exact paths:
   shouldn't relight the face).
 - Both funnel through `prv_refresh_to_exact()`, which no-ops if the exact time is
   already on screen — this is what stops a walk from repainting every stride.
+  (An exact reading now expires at the next minute tick, so during a walk the
+  face cycles static → lock-on ramp → clean → static about once a minute rather
+  than sitting clean between grid ticks.)
 
 ## Power model
 
@@ -168,16 +186,21 @@ of it is legere-specific; it applies to any minimal watchface.
 ## Diagnostic log (temporary)
 
 A `DayRecord` ring buffer (`DAYS_KEPT = 14`, 32 B/day in persist storage) records
-per-hour shake-trigger counts and a Quiet Time bitmask. Export path:
+per-hour shake-trigger counts and a Quiet Time bitmask. Two export paths:
 
-- **`APP_LOG` rows** in the exact CSV shape, one per finished hour, because the
-  official Pebble app doesn't yet surface a Settings webview for sideloaded
-  apps. `pebble logs | tee watch.log` then `tools/pebble-log-to-csv.py`.
+- **`APP_LOG` rows** in the exact CSV shape, emitted **only when an hour
+  finishes** (the first tick of the next hour, `prv_tick_handler`). The
+  in-progress hour is never logged; earlier hours today land in the log only if
+  `pebble logs` was capturing across each hour boundary.
+  `pebble logs | tee watch.log` then `tools/pebble-log-to-csv.py`.
+- **AppMessage** → `src/pkjs/index.js` → the settings page's "Diagnostic log"
+  section (CSV + Web Share / textarea). `prv_inbox_received_handler` catches
+  `RequestLog` and `prv_export_send_next` streams every non-empty persist slot,
+  **including today's partial record** (created + persisted by the first tick
+  after midnight), paced by `prv_outbox_sent_handler`, then `Done`.
 
-(An earlier AppMessage → pkjs → Web Share export was removed when the companion
-became the settings/ko-fi page. The watch-side `RequestLog` / `prv_outbox_*`
-handlers are still compiled in but nothing calls them now — they go with the
-rest of this instrumentation at store launch.)
+Note both paths read persist storage, which `pebble install` **wipes** — after a
+reinstall there is no history, only what has accrued since.
 
 Q17 (grill): a temporary hourly **battery-%** sample is to be added to
 `DayRecord` while the face is being finished — to catch legere doing something
