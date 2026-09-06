@@ -54,22 +54,22 @@
         {
           "type": "font",
           "name": "FONT_DATE_14",
-          "file": "fonts/Michroma-Regular.ttf",
-          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
+          "file": "fonts/Orbitron-Bold.ttf",
+          "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["gabbro"]
         },
         {
           "type": "font",
           "name": "FONT_DATE_18",
-          "file": "fonts/Michroma-Regular.ttf",
-          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
+          "file": "fonts/Orbitron-Bold.ttf",
+          "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["emery"]
         },
         {
           "type": "font",
           "name": "FONT_DATE_21",
-          "file": "fonts/Michroma-Regular.ttf",
-          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
+          "file": "fonts/Orbitron-Bold.ttf",
+          "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["emery"]
         }
       ]

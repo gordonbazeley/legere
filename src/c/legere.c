@@ -15,8 +15,9 @@ static Layer *s_date_layer;
 // false = the minute is floored to a multiple of 5 (passive, minute digits snow)
 static bool s_exact = false;
 
-// Date line: Michroma. Glyph subset in package.json covers A-Z, digits, space,
-// '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL.
+// Date line: Orbitron Bold. Glyph subset in package.json covers A-Z, digits,
+// space, '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL —
+// Orbitron doesn't cut Ð/Ø/Þ, but none of those locales need them.
 static GFont s_date_font;
 static bool s_date_font_custom;
 
@@ -317,23 +318,10 @@ static void prv_staticify(GContext *ctx, GRect r, int permille) {
   graphics_release_frame_buffer(ctx, fb);
 }
 
-#define DATE_BOLD_PX 1   // faux-bold smear for the date row, in px (Michroma has one weight)
-
-// Smears the glyph both ways so vertical and horizontal strokes thicken by the
-// same amount — an x-only smear widens vertical strokes only, leaving
-// horizontal ones at their original weight and looking uneven.
 static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font,
                           GTextAlignment align, GColor color) {
   graphics_context_set_text_color(ctx, color);
   graphics_draw_text(ctx, text, font, box, GTextOverflowModeFill, align, NULL);
-  for (int i = 1; i <= DATE_BOLD_PX; i++) {
-    GRect bx = box;
-    bx.origin.x += i;
-    graphics_draw_text(ctx, text, font, bx, GTextOverflowModeFill, align, NULL);
-    GRect by = box;
-    by.origin.y += i;
-    graphics_draw_text(ctx, text, font, by, GTextOverflowModeFill, align, NULL);
-  }
 }
 
 // Cached date-row strings: strftime + the uppercase pass only re-run on a date
@@ -457,8 +445,8 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
 }
 
 // Date row: weekday left, day-of-month centre, month right — three L/C/R strings
-// over one shared box (Michroma is too wide to force equal thirds and stay
-// legible). Whole row is DATE_COLOR — a constant mid blue, no freshness signal
+// over one shared box (the font is too wide to force equal thirds and stay
+// legible). Whole row is DATE_COLOR — a constant white, no freshness signal
 // here. The box is layer-relative (y = 0): s_date_layer is framed at s_date_top.
 static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);

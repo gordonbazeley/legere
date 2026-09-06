@@ -5,7 +5,9 @@
 - Shake-log CSV and phone settings-page log now list newest day/hour first
   instead of oldest.
 - Date row is now a hardcoded solid white instead of a mid-blue tint, and
-  drawn with a heavier faux-bold smear (was looking faint).
+  the font is Orbitron Bold instead of Michroma — a real bold weight instead
+  of a faux-bold pixel smear (Michroma has no bold cut at all).
+- Minute row is now offset 15px left of the hour row for a slight stagger.
 - Passive-minute static is dialed back (was a full 1000/1000 permille snowed,
   now 350/1000) so it reads as less agitated.
 - CI now builds the `.pbw` on every push to `main`.
