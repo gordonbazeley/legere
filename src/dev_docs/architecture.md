@@ -129,6 +129,31 @@ legere's controllable levers, in full:
 The 5-minute grid saves an estimated ~6–26 µA (≈ under one day over 21) — real
 but a rounding error. It is kept as an identity choice, not a power play.
 
+## Battery guidance (for the store listing)
+
+legere's own draw is negligible; a Pebble Time 2 owner's battery life is set
+almost entirely by system settings. What to tell users in the listing:
+
+1. **Turn off motion-activated backlight.** The single biggest lever — forum
+   users report ~14 → 20+ days from this alone. (Settings → Backlight → Motion.)
+2. **Set heart-rate background sampling to 30 min or hourly, not 10 min.** No
+   figure is published, but the estimate is 10-min costs ~0.3–1 mAh/day
+   (~15–45 µA) more than 30-min ≈ 1–4 fewer days on a 20–30 day baseline.
+   PebbleOS already skips HR samples when the watch lies flat and never samples
+   on the charger, so the overnight cost of either setting is zero — the gap is
+   only ~14 waking wrist-hours/day. "HR during activities" is a separate setting
+   that goes continuous during a detected walk/run regardless of the background
+   interval. (Source: PebbleOS `src/fw/services/activity/activity.c`,
+   `activity_private.h`; help.repebble.com battery article.)
+3. **Keep notification volume modest** — each notification wakes the screen and
+   often the backlight; vibration adds actuator draw.
+4. **Keep Bluetooth connected and stable** — steady connected draw is ~50 µA;
+   it's the disconnect/reconnect churn that's expensive.
+5. Run reasonably current PebbleOS — early firmware had battery bugs.
+
+With all of that, ~21 days is realistic and legere does nothing to stop it. None
+of it is legere-specific; it applies to any minimal watchface.
+
 ## Diagnostic log (temporary)
 
 A `DayRecord` ring buffer (`DAYS_KEPT = 14`, 32 B/day in persist storage) records

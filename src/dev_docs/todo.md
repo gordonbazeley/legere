@@ -57,19 +57,19 @@ is the grill session captured in `decisions.md`.
   settings/companion pattern in `~/src/tidepebble` (`src/pkjs/settings.html` +
   the generated `settings-html.js` wrapper, `open_config.js` dev helper).
 - [ ] **Listing pass.** Store assets (icon sizes, banner, screenshots),
-  description copy. Include battery guidance in the description: for best battery
-  life, disable motion-activated backlight and set HR to its longest interval or
-  off — these dominate; legere's own draw is negligible.
+  description copy. Pull the battery guidance from `architecture.md` → "Battery
+  guidance (for the store listing)" into the description.
 - [ ] Remove the diagnostic instrumentation (checklist above) before submitting.
 - [ ] Confirm `author` / `displayName` / `uuid` in `package.json` are what you
   want on the store (`author` is currently `MakeAwesomeHappen`).
 
-## Research still open
+## Research — done
 
-- [ ] **HR 10 vs 30 min — hard number.** A background research agent is digging
-  for a measured figure (µA or days) rather than the order-of-magnitude estimate
-  in the grill. Fold the answer into the battery guidance above and
-  `decisions.md` when it lands.
+- [x] **HR 10 vs 30 min.** No published/measured figure exists — Core Devices
+  publishes only the ordering (10min > 30min > hourly > off). Estimate: ~0.3–1
+  mAh/day (~15–45 µA), ~1–4 fewer days on a 20–30 day baseline. PebbleOS skips
+  HR when the watch is flat and never on the charger. Captured in
+  `architecture.md` → Battery guidance.
 
 ## Housekeeping
 
