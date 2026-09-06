@@ -107,7 +107,13 @@ ramp's final `prv_shimmer_tick` clears `s_exact`.
 ## Time model
 
 - `prv_display_hour()` — 12/24h from `clock_is_24h_style()` (system preference).
-- `prv_floor5()` — minutes floored to a multiple of 5 for the passive display.
+- `s_passive_min` — the minute shown while passive. `prv_tick_handler` keeps it
+  grid-aligned (`prv_floor5()`-equivalent, since it only writes tick_time->tm_min
+  at ticks where that's already a multiple of the step) during normal
+  operation, but pins it to the real (unfloored) minute the instant an exact
+  reading expires — otherwise it would floor back to the grid mark *before*
+  that minute (exact "12:33" → static "12:30"), which reads as the clock
+  rewinding. Re-syncs to the grid at the next scheduled tick either way.
 - `s_exact` — `false` after a scheduled passive repaint, `true` after a
   shake/tap/backlight-forced one. Drives the minute static only (whether
   `prv_staticify` runs, and at what density during the ramp).

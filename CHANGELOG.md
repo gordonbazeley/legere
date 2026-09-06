@@ -10,6 +10,11 @@
 - Minute row is now offset 15px left of the hour row for a slight stagger.
 - Passive-minute static is dialed back (was a full 1000/1000 permille snowed,
   now 350/1000) so it reads as less agitated.
+- Fixed a jump-backward glitch: when a shaken-exact reading expired, the
+  display used to floor to the 5-minute grid mark *before* the exact minute
+  (e.g. exact "12:33" -> static "12:30"), which read as the clock rewinding.
+  It now holds the real minute the reveal just expired at (static "12:34"
+  instead) and only re-syncs to the grid at the next scheduled tick.
 - CI now builds the `.pbw` on every push to `main`.
 
 ### Gotcha: Quiet Time can turn on from a calendar event, not just the toggle

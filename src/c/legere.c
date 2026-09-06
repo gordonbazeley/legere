@@ -15,6 +15,14 @@ static Layer *s_date_layer;
 // false = the minute is floored to a multiple of 5 (passive, minute digits snow)
 static bool s_exact = false;
 
+// Minute shown while passive. Normally kept on the 5-minute grid (or hourly in
+// Quiet Time) by prv_tick_handler's scheduled resync below, but the moment an
+// exact reading expires it's pinned at that real (unfloored) minute instead of
+// jumping back to the grid mark before it — so a shake at :33 that expires at
+// :34 shows a static "34", not a static "30". It re-syncs to the grid at the
+// next scheduled tick either way.
+static int s_passive_min = 0;
+
 // Date line: Orbitron Bold. Glyph subset in package.json covers A-Z, digits,
 // space, '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL —
 // Orbitron doesn't cut Ð/Ø/Þ, but none of those locales need them.
@@ -388,7 +396,7 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
 
   bool h24 = clock_is_24h_style();
   int hour = prv_display_hour(t);
-  int disp_min = s_exact ? t->tm_min : prv_floor5(t->tm_min);
+  int disp_min = s_exact ? t->tm_min : s_passive_min;
 
   // Hour and minute stacked: two digits per row, the pair centred as a unit so a
   // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
@@ -526,6 +534,7 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // at :59; a near-full minute if you shook at :00 — which is the point.)
   if (s_exact && !s_shimmer_out &&
       (tick_time->tm_hour != s_exact_hour || tick_time->tm_min != s_exact_min)) {
+    s_passive_min = tick_time->tm_min;  // hold this minute, don't floor back past it
     s_shimmer_out = true;
     s_shimmer_left = SHIMMER_FRAMES;
     if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
@@ -540,6 +549,7 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   int step = quiet ? 60 : 5;
   if (tick_time->tm_min % step == 0) {
     s_exact = false;
+    s_passive_min = tick_time->tm_min;  // already grid-aligned here - resync point
     s_sched_hour = tick_time->tm_hour;
     s_sched_min = tick_time->tm_min;
     layer_mark_dirty(s_digits_layer);
@@ -583,6 +593,9 @@ static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   window_set_background_color(window, GColorBlack);
+
+  time_t now = time(NULL);
+  s_passive_min = prv_floor5(localtime(&now)->tm_min);  // first render, before any tick fires
 
   s_pad = PAD;
   s_usable_w = bounds.size.w - 2 * s_pad;
