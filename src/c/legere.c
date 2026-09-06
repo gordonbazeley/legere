@@ -33,7 +33,9 @@ static int s_pad;
 static int s_usable_w;
 
 #define PAD PBL_IF_ROUND_ELSE(18, 6)
-#define DIGIT_GAP PBL_IF_ROUND_ELSE(4, 5)   // px between the hour and minute rows
+// px between the hour and minute rows; negative on emery = the minute row
+// deliberately overlaps the hour row (dense stacked effect, hour drawn dark).
+#define DIGIT_GAP PBL_IF_ROUND_ELSE(4, -20)
 #define DIGIT_BAND_BOT_GAP PBL_IF_ROUND_ELSE(4, 5)  // px between the minute row and the date row
 
 static GSize prv_measure(const char *text, GFont font) {
@@ -227,10 +229,12 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
   for (char *c = mon; *c; c++) *c = toupper((unsigned char)*c);
 
   // Hour and minute stacked: two digits per row, the pair centred as a unit so a
-  // narrow "1" doesn't shove the block sideways. Rows packed tight (only
-  // DIGIT_GAP between them) and the whole block centred in the space above the
-  // date. On the round display the grid is pulled in from both edges so its
-  // corners clear the bezel — same proportions as the rectangular face.
+  // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
+  // so the white minute row overlaps and paints over the foot of the dark-grey
+  // hour row — a deliberate dense stack that buys bigger digits. The whole block
+  // is centred in the space above the date. On the round display the grid is
+  // pulled in from both edges so its corners clear the bezel, and the rows keep
+  // a normal positive gap.
   if (s_sheet) {
     int grid_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
     int grid_x = s_pad + (s_usable_w - grid_w) / 2;
@@ -247,7 +251,7 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
       int y = block_top + row * (s_slot_h + DIGIT_GAP);
       for (int k = 0; k < n; k++) {
         int idx = row * 2 + (n == 1 ? 1 : k);
-        prv_set_ink(s_digit[dv[idx]], row == 0 ? GColorLightGray : GColorWhite);
+        prv_set_ink(s_digit[dv[idx]], row == 0 ? GColorDarkGray : GColorWhite);
         graphics_draw_bitmap_in_rect(ctx, s_digit[dv[idx]],
                                      GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h));
       }

@@ -126,4 +126,4 @@ PYEOF
 
 #            name       max_w max_h
 build_sheet  digits        66    62   # gabbro (180x180 round)
-build_sheet  digits_lg     99    94   # emery  (200x228)
+build_sheet  digits_lg    110   103   # emery  (200x228), overlapped rows
