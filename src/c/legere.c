@@ -316,7 +316,7 @@ static void prv_staticify(GContext *ctx, GRect r, int permille) {
   graphics_release_frame_buffer(ctx, fb);
 }
 
-#define DATE_BOLD_PX 1   // faux-bold smear for the date row (Michroma has one weight)
+#define DATE_BOLD_PX 2   // faux-bold smear for the date row (Michroma has one weight)
 
 static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font,
                           GTextAlignment align, GColor color) {
