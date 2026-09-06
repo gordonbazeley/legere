@@ -134,8 +134,12 @@ contained, and it's the difference between "German users see MÄR" and "German
 users see a tofu box or English". Non-Latin scripts would blow the font cost and
 likely break the layout for a date line.
 
-**State:** not implemented — `strftime` currently runs in the C locale (always
-English) and the font is subset to `[A-Z0-9 ]`.
+**State:** implemented, pending a hardware pass. `setlocale` wired in `prv_init`;
+`prv_utf8_upper` does non-ASCII uppercasing; date font is `Michroma-Regular.ttf`
+subset to `[A-Z0-9 .À-ÖØ-Þß]`. Emery picks 21px or 18px at load
+(`prv_pick_date_font`) by measuring the locale's widest weekday/month strings —
+FR/ES overrun 21px ("SEPT." + accented period-weekdays), the rest keep 21.
+Untested with a real non-English language pack — the emulator can't install one.
 
 ## Diagnostic instrumentation is temporary
 

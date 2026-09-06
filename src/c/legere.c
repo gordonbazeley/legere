@@ -1,5 +1,6 @@
 #include <pebble.h>
 #include <ctype.h>
+#include <locale.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,7 +15,8 @@ static Layer *s_date_layer;
 // false = the minute is floored to a multiple of 5 (passive) -> month drawn blue
 static bool s_exact = false;
 
-// Date line: Michroma, same family as the digits. Subset to [A-Z0-9 ].
+// Date line: Michroma. Glyph subset in package.json covers A-Z, digits, space,
+// '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL.
 static GFont s_date_font;
 static bool s_date_font_custom;
 
@@ -228,11 +230,22 @@ static void prv_set_ink(GBitmap *b, GColor c) {
   }
 }
 
-// Overwrite the solid minute-ink pixels inside `r` with random LightGray/White
-// "snow" — a no-signal look for the passive (floored) minutes. Works at the
-// framebuffer level so it needs no offscreen bitmap: only fully-opaque white
-// pixels (the glyph interiors, drawn white just above) are touched, so the
-// anti-aliased glyph edges survive as a clean outline around the noise.
+// Snow palette: each solid minute-ink pixel is replaced by a random entry.
+// White/LightGray only (the old mix) barely registers on the emery reflective
+// LCD unlit — too little contrast. This spread runs white down to black, so the
+// passive minutes read as a genuinely noisy, half-lost signal. Tune by editing
+// the table: more Black = more "dropout" holes, more White = brighter static.
+// ponytail: shared across emery + gabbro; re-check the gabbro round slot if the
+// mix changes (it clamps fine today).
+static const uint8_t SNOW[4] = {
+  GColorWhiteARGB8, GColorLightGrayARGB8, GColorDarkGrayARGB8, GColorBlackARGB8,
+};
+
+// Overwrite the solid minute-ink pixels inside `r` with random SNOW "snow" — a
+// no-signal look for the passive (floored) minutes. Works at the framebuffer
+// level so it needs no offscreen bitmap: only fully-opaque white pixels (the
+// glyph interiors, drawn white just above) are touched, so the anti-aliased
+// glyph edges survive as a clean outline around the noise.
 static void prv_staticify(GContext *ctx, GRect r) {
   GBitmap *fb = graphics_capture_frame_buffer(ctx);
   if (!fb) return;
@@ -246,7 +259,7 @@ static void prv_staticify(GContext *ctx, GRect r) {
     if (x1 > ri.max_x + 1) x1 = ri.max_x + 1;
     for (int x = x0; x < x1; x++) {
       if (ri.data[x] == GColorWhiteARGB8) {
-        ri.data[x] = (rand() & 1) ? GColorWhiteARGB8 : GColorLightGrayARGB8;
+        ri.data[x] = SNOW[rand() & 3];
       }
     }
   }
@@ -267,8 +280,61 @@ static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font
 
 // Cached date-row strings: strftime + the uppercase pass only re-run on a date
 // change, not on every passive repaint. -1 = not built yet.
-static char s_dow[4], s_dom[4], s_mon[4];
+static char s_dow[12], s_dom[4], s_mon[12];
 static int s_str_mday = -1;
+
+// Uppercase ASCII + the Latin-1 supplement (UTF-8 0xC3 0xA0..0xBE, minus ÷),
+// which covers every accented letter FR/DE/ES/IT/PT/NL put in a weekday/month
+// abbreviation. Plain toupper() only touches ASCII and would leave "mär" ->
+// "mÄr". ß (0xC3 0x9F) has no single-char uppercase, so it's left alone.
+static void prv_utf8_upper(char *s) {
+  for (unsigned char *c = (unsigned char *)s; *c; c++) {
+    if (*c < 0x80) {
+      *c = toupper(*c);
+    } else if (*c == 0xC3 && c[1] >= 0xA0 && c[1] <= 0xBE && c[1] != 0xB7) {
+      c[1] -= 0x20;  // lowercase -> uppercase within the Latin-1 block
+      c++;
+    }
+  }
+}
+
+#if defined(PBL_PLATFORM_EMERY)
+#define DATE_CELL_GAP 6   // min px wanted between the weekday / day / month cells
+
+// The date row wants 21px, but the widest localised rows (FR/ES: "SEPT." plus an
+// accented weekday) overrun s_usable_w at 21 and the three L/C/R cells collide.
+// Rather than hardcode which locales are wide, measure every weekday + month
+// abbreviation this locale actually produces and only drop to 18px if 21 won't
+// fit. One-time at window load — not on any repaint path.
+static GFont prv_pick_date_font(void) {
+  GFont big = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_21));
+  if (!big) return fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_18));
+
+  struct tm probe;
+  memset(&probe, 0, sizeof probe);
+  char buf[12];
+  int wide_dow = 0, wide_mon = 0;
+  for (int i = 0; i < 12; i++) {
+    probe.tm_mon = i;                       // %b reads tm_mon directly
+    strftime(buf, sizeof buf, "%b", &probe);
+    prv_utf8_upper(buf);
+    int w = prv_measure(buf, big).w;
+    if (w > wide_mon) wide_mon = w;
+  }
+  for (int i = 0; i < 7; i++) {
+    probe.tm_wday = i;                      // %a reads tm_wday directly
+    strftime(buf, sizeof buf, "%a", &probe);
+    prv_utf8_upper(buf);
+    int w = prv_measure(buf, big).w;
+    if (w > wide_dow) wide_dow = w;
+  }
+  int need = wide_dow + prv_measure("88", big).w + wide_mon + 2 * DATE_CELL_GAP;
+  if (need <= s_usable_w) return big;
+
+  fonts_unload_custom_font(big);
+  return fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_18));
+}
+#endif
 
 static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);
@@ -344,8 +410,8 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
     strftime(s_dow, sizeof s_dow, "%a", t);
     strftime(s_dom, sizeof s_dom, "%d", t);
     strftime(s_mon, sizeof s_mon, "%b", t);
-    for (char *c = s_dow; *c; c++) *c = toupper((unsigned char)*c);
-    for (char *c = s_mon; *c; c++) *c = toupper((unsigned char)*c);
+    prv_utf8_upper(s_dow);
+    prv_utf8_upper(s_mon);
     s_str_mday = t->tm_mday;
   }
 
@@ -465,10 +531,9 @@ static void prv_window_load(Window *window) {
   // block (see s_date_top below) — round keeps its bot_margin-anchored,
   // bezel-tuned layout untouched.
   int top_margin = PBL_IF_ROUND_ELSE(16, 5);
-  int bot_margin = PBL_IF_ROUND_ELSE(22, 2);
 
 #if defined(PBL_PLATFORM_EMERY)
-  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_21));
+  s_date_font = prv_pick_date_font();   // 21px, or 18px where the locale is too wide
 #else
   s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_14));
 #endif
@@ -497,6 +562,7 @@ static void prv_window_load(Window *window) {
   // 5px instead of splitting leftover slack between them.
   s_date_top = top_margin + 2 * s_slot_h + DIGIT_GAP + DIGIT_BAND_BOT_GAP;
 #else
+  int bot_margin = PBL_IF_ROUND_ELSE(22, 2);  // round only; bezel-tuned
   s_date_top = bounds.size.h - bot_margin - s_date_h;
 #endif
 
@@ -531,6 +597,10 @@ static void prv_init(void) {
     .unload = prv_window_unload,
   });
   window_stack_push(s_window, true);
+
+  // Latin-script locales only (FR/DE/ES/IT/PT/NL). Makes strftime %a/%b return
+  // localised weekday/month abbreviations; prv_utf8_upper handles the casing.
+  setlocale(LC_ALL, i18n_get_system_locale());
 
   srand(time(NULL));  // seeds the minute-snow noise
 

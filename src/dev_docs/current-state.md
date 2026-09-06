@@ -2,7 +2,8 @@
 
 ## What works
 
-- Stacked hour/minute digits on `emery` (200×228) and `gabbro` (180 round),
+- Stacked hour/minute digits on `emery` (200×228) and `gabbro` (260×260 round;
+  layout still sized for 180 — see below),
   pre-rendered from Alfa Slab One via `tools/gen-digits.sh`.
 - Emery: digits 93×103, minute row overlapping the hour row −20px, hour row
   `GColorDarkGray`.
@@ -32,13 +33,19 @@
 
 ## Not done yet — see `todo.md`
 
-- **Static on gabbro (round).** `prv_staticify` is platform-agnostic (framebuffer
-  capture works on gabbro's 8-bit format) but only tested on emery. Check the
-  snow reads at the smaller 58×62 slot and that the minute-row rect is right on
-  round.
-- **Locale.** No `setlocale()` call — `strftime` runs in the C locale, always
-  English. Date font subset is `[A-Z0-9 ]`; `toupper` is ASCII-only. "Locale
-  from system settings" is a stated goal, not wired.
+- **gabbro layout tuned for 180, not 260.** gabbro is 260×260 round; the layout
+  constants (`grid_w = 132`, paddings, 58×62 digit sheet) were built for 180.
+  Renders fine but the digits are small (~45% width) with a dead strip above the
+  date. Retune + bigger sprite sheet — see `todo.md`. (Static itself is
+  verified working on gabbro.)
+- **Locale — mostly wired (Latin-script scope).** `prv_init` calls
+  `setlocale(LC_ALL, i18n_get_system_locale())`; `strftime %a/%b` then follow the
+  installed language pack (English if none). `prv_utf8_upper` uppercases ASCII +
+  the Latin-1 accented block. Date font is `Michroma-Regular.ttf` subset to
+  `[A-Z0-9 .À-ÖØ-Þß]`. Emery date font is picked at window load
+  (`prv_pick_date_font`): 21px normally, 18px only if the locale's widest
+  weekday+month abbreviations wouldn't fit at 21 (FR/ES, with "SEPT." + accented
+  period-weekdays). Untested on real hardware with a non-English language pack.
 - **Temporary battery-% sampling** in `DayRecord` (Q17) — not added.
 - **ko-fi link** in the settings page — not added (copy the approach from
   `~/src/tidepebble`).
@@ -89,7 +96,7 @@
 | `package.json` | Pebble metadata, message keys, resources |
 | `wscript` | SDK build rules (unmodified) |
 | `resources/fonts/AlfaSlabOne-Regular.ttf` | Source for the digit sprite sheets |
-| `resources/fonts/MichromaText.ttf` | Date row font (loaded as `FONT_DATE_14` / `FONT_DATE_21`) |
+| `resources/fonts/Michroma-Regular.ttf` | Date row font (`FONT_DATE_14` on gabbro; `FONT_DATE_21` or `_18` on emery, picked at load) |
 | `resources/images/digits.png` | gabbro sprite sheet — slot 58×62 |
 | `resources/images/digits_lg.png` | emery sprite sheet — slot 93×103 |
 | `resources/images/icon.png` | Launcher icon, 25×25, white glyph + black keyline |

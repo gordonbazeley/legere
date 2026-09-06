@@ -11,9 +11,20 @@ is the grill session captured in `decisions.md`.
 - [ ] **Tune the shimmer on hardware.** `SHIMMER_FRAMES 5` / `SHIMMER_MS 55` is a
   guess. Check the lock-on feel on a real wrist — may want longer/shorter, or a
   brightness ramp rather than pure snow-then-clean.
-- [ ] **Check the static on gabbro** (round, 58×62 slot) — code is
-  platform-agnostic but untested there.
-- [ ] **Validate the overlap + dark-grey hour on hardware.** `67ae9f5` is
+- [x] **Check the static on gabbro** (round, 58×62 slot). Done — verified in the
+  gabbro emulator (`22:57` passive + shake-to-exact). Snow renders correctly at
+  the 58×62 slot on gabbro's round 8-bit framebuffer: clean glyph outline, only
+  the minute row snowed, hour stays solid dark grey, nothing bleeds into the
+  date row. `prv_staticify`'s per-row `gbitmap_get_data_row_info` clamping is
+  what makes it round-safe.
+- [ ] **Retune the gabbro layout for 260×260.** gabbro is 260×260 round, not the
+  180 the layout was built for (`grid_w = 132`, `PAD 18`, `top_margin 16` /
+  `bot_margin 22`, `digits.png` 58×62 slot all assume 180). On 260 the digits
+  fill ~45% of the width and the block sits high with a ~47px dead strip between
+  the minute row and the date. Bump `grid_w`, regenerate a bigger `digits`
+  sheet in `tools/gen-digits.sh` (currently `66 62`), and recentre. Not urgent —
+  it reads fine, just small.
+- [x] **Validate the overlap + dark-grey hour on hardware.** `67ae9f5` is
   unvalidated. Check dark-grey-on-black legibility unlit and the digit
   foot/head collision on `22:57` / `12:38` / `08:07`. If the hour is too dim,
   revert it to `GColorLightGray` and keep the −20 overlap.
@@ -42,14 +53,23 @@ is the grill session captured in `decisions.md`.
 
 ## Locale (Latin-script scope — see `decisions.md`)
 
-- [ ] `setlocale(LC_ALL, i18n_get_system_locale())` in `prv_init`.
-- [ ] Expand the `FONT_DATE_*` `characterRegex` in `package.json` from
-  `[A-Z0-9 ]` to cover Latin-1 accented capitals (À-Þ minus ×, plus any
-  lowercase that survives if uppercasing misses them).
-- [ ] Replace the ASCII `toupper` loops over `dow` / `mon` with something
-  non-ASCII-safe, or drop the uppercasing for locales where it's wrong.
-- [ ] Check the date row still fits the widest localised weekday/month at
-  `FONT_DATE_21` on emery.
+- [x] `setlocale(LC_ALL, i18n_get_system_locale())` in `prv_init`. Done.
+- [x] Expand the `FONT_DATE_*` `characterRegex`. Done — now
+  `[A-Z0-9 .À-ÖØ-Þß]`. Also swapped the font file from `MichromaText.ttf` (a
+  hand-subset copy with only `[A-Z0-9 ]` — no accents, no `.`) to the full
+  `Michroma-Regular.ttf`; `characterRegex` does the subsetting at build.
+- [x] Replace the ASCII `toupper` loops. Done — `prv_utf8_upper` handles ASCII +
+  the whole Latin-1 accented lowercase block (0xC3 0xA0..0xBE). ß has no
+  single-char uppercase, left as-is.
+- [x] Check the date row fits. Done — the widest realistic row is French
+  "SEPT. 06 AOÛT" ("sept." abbreviation + accented weekday), which collides at
+  21px. Rather than hardcode a locale list, `prv_pick_date_font` measures every
+  weekday + month abbreviation the active locale produces at load and uses 21px
+  if they fit, else 18px. EN/DE/IT/PT/NL keep 21; FR (and probably ES) get 18.
+  Verified in the emulator: EN picks 21, forced-wide strings pick 18 and clear.
+- [ ] **Validate locale on hardware.** Emulator can't install a language pack,
+  so the real localised strings are still untested. Install FR (worst case) + DE
+  packs on emery, confirm the row fits unlit and the accented caps render.
 
 ## Instrumentation (temporary — all of this comes out at store launch)
 
@@ -93,3 +113,5 @@ is the grill session captured in `decisions.md`.
 - [ ] `design/plain.png` is a superseded mockup — replace with a current render
   or delete.
 - [ ] Uncommitted as of this doc: the `icon.png` keyline change. Commit it.
+- [ ] `resources/fonts/MichromaText.ttf` is now unused (locale work switched the
+  date row to `Michroma-Regular.ttf`). Delete it.

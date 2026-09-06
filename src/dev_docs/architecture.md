@@ -41,7 +41,8 @@ for the full pipeline — shared-baseline crop, counter-hole punching, alpha
 quantisation, per-digit right-alignment).
 
 - `emery`  → `IMAGE_DIGITS_LG` — slot 93×103, rows overlap −20px (see below)
-- `gabbro` → `IMAGE_DIGITS`    — slot 58×62
+- `gabbro` → `IMAGE_DIGITS`    — slot 58×62 (sized for a 180 round; gabbro is
+  actually 260×260 — layout retune pending, see `todo.md`)
 
 ### Layout (`prv_window_load`)
 

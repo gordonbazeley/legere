@@ -53,15 +53,22 @@
         {
           "type": "font",
           "name": "FONT_DATE_14",
-          "file": "fonts/MichromaText.ttf",
-          "characterRegex": "[A-Z0-9 ]",
+          "file": "fonts/Michroma-Regular.ttf",
+          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
           "targetPlatforms": ["gabbro"]
         },
         {
           "type": "font",
+          "name": "FONT_DATE_18",
+          "file": "fonts/Michroma-Regular.ttf",
+          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
+          "targetPlatforms": ["emery"]
+        },
+        {
+          "type": "font",
           "name": "FONT_DATE_21",
-          "file": "fonts/MichromaText.ttf",
-          "characterRegex": "[A-Z0-9 ]",
+          "file": "fonts/Michroma-Regular.ttf",
+          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
           "targetPlatforms": ["emery"]
         }
       ]
