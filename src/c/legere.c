@@ -316,13 +316,17 @@ static void prv_staticify(GContext *ctx, GRect r, int permille) {
   graphics_release_frame_buffer(ctx, fb);
 }
 
-#define DATE_BOLD_PX 2   // faux-bold smear for the date row (Michroma has one weight)
+#define DATE_BOLD_PX 1   // full-strength faux-bold smear, in px (Michroma has one weight)
+#define DATE_BOLD_FRINGE_COLOR GColorLightGray  // half-strength extra px, for a ~1.5px weight
 
 // Smears the glyph both ways so vertical and horizontal strokes thicken by the
-// same amount — an x-only smear (the old approach) only widens vertical
-// strokes, leaving horizontal ones their original weight and looking uneven.
+// same amount — an x-only smear widens vertical strokes only, leaving
+// horizontal ones at their original weight and looking uneven. `fringe`
+// draws one further pixel past DATE_BOLD_PX in DATE_BOLD_FRINGE_COLOR (a
+// lighter shade rather than full `color`) to fake a half-pixel of extra
+// weight — a full second solid pixel (2px total) blurred letters together.
 static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font,
-                          GTextAlignment align, GColor color) {
+                          GTextAlignment align, GColor color, bool fringe) {
   graphics_context_set_text_color(ctx, color);
   graphics_draw_text(ctx, text, font, box, GTextOverflowModeFill, align, NULL);
   for (int i = 1; i <= DATE_BOLD_PX; i++) {
@@ -331,6 +335,15 @@ static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font
     graphics_draw_text(ctx, text, font, bx, GTextOverflowModeFill, align, NULL);
     GRect by = box;
     by.origin.y += i;
+    graphics_draw_text(ctx, text, font, by, GTextOverflowModeFill, align, NULL);
+  }
+  if (fringe) {
+    graphics_context_set_text_color(ctx, DATE_BOLD_FRINGE_COLOR);
+    GRect bx = box;
+    bx.origin.x += DATE_BOLD_PX + 1;
+    graphics_draw_text(ctx, text, font, bx, GTextOverflowModeFill, align, NULL);
+    GRect by = box;
+    by.origin.y += DATE_BOLD_PX + 1;
     graphics_draw_text(ctx, text, font, by, GTextOverflowModeFill, align, NULL);
   }
 }
@@ -445,9 +458,9 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
     snprintf(min_str, sizeof min_str, "%02d", disp_min);
     GFont f = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
     prv_draw_cell(ctx, GRect(s_pad, s_digit_band_top, s_usable_w, 48),
-                  hour_str, f, GTextAlignmentRight, GColorWhite);
+                  hour_str, f, GTextAlignmentRight, GColorWhite, false);
     prv_draw_cell(ctx, GRect(s_pad, s_digit_band_top + 50, s_usable_w, 48),
-                  min_str, f, GTextAlignmentRight, GColorWhite);
+                  min_str, f, GTextAlignmentRight, GColorWhite, false);
   }
 
   s_drawn_hour = hour;
@@ -473,9 +486,9 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
 
   int date_w = PBL_IF_ROUND_ELSE(174, s_usable_w);  // round: narrower than usable so the row clears the arc
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
-  prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, DATE_COLOR);
-  prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, DATE_COLOR);
-  prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, DATE_COLOR);
+  prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, DATE_COLOR, true);
+  prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, DATE_COLOR, true);
+  prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, DATE_COLOR, true);
 }
 
 // ponytail stopgap: the official Pebble app doesn't surface a Settings
