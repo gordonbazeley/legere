@@ -12,7 +12,8 @@ see `decisions.md` → "The 5-minute grid is an identity choice, not a power
 optimisation"). It is a low-*fuss* face that also happens to do nothing
 wasteful.
 
-Single-file watch app, no phone companion logic beyond a diagnostic log export.
+Single-file watch app. The phone companion is just a static settings page
+(info + ko-fi link); there is no configurable state.
 
 ```
 tick (every minute, from the OS)
@@ -167,13 +168,16 @@ of it is legere-specific; it applies to any minimal watchface.
 ## Diagnostic log (temporary)
 
 A `DayRecord` ring buffer (`DAYS_KEPT = 14`, 32 B/day in persist storage) records
-per-hour shake-trigger counts and a Quiet Time bitmask. Two export paths:
+per-hour shake-trigger counts and a Quiet Time bitmask. Export path:
 
-- **AppMessage** → phone config page (`src/pkjs/index.js`), which builds a CSV
-  and hands it to the Web Share API / a copy-paste textarea.
 - **`APP_LOG` rows** in the exact CSV shape, one per finished hour, because the
   official Pebble app doesn't yet surface a Settings webview for sideloaded
   apps. `pebble logs | tee watch.log` then `tools/pebble-log-to-csv.py`.
+
+(An earlier AppMessage → pkjs → Web Share export was removed when the companion
+became the settings/ko-fi page. The watch-side `RequestLog` / `prv_outbox_*`
+handlers are still compiled in but nothing calls them now — they go with the
+rest of this instrumentation at store launch.)
 
 Q17 (grill): a temporary hourly **battery-%** sample is to be added to
 `DayRecord` while the face is being finished — to catch legere doing something

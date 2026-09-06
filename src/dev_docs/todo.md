@@ -84,20 +84,22 @@ is the grill session captured in `decisions.md`.
   the whole `--- Phone export ---` block, `prv_outbox_*` / `prv_inbox_received`
   handlers, the `APP_LOG` "row" and "shake-wake" lines, `tools/pebble-log-to-csv.py`,
   the `Year`/`Mon`/`Mday`/`Shakes`/`QuietMask`/`Done`/`RequestLog` message keys.
-  Decide then whether `src/pkjs/index.js` + the `configurable` capability stay
-  for the ko-fi page or go with the export.
+  `src/pkjs/index.js` + the `configurable` capability **stay** — they now serve
+  the settings/ko-fi page. `index.js` is already down to the `showConfiguration`
+  handler; the pkjs CSV-export code is gone.
 
 ## Store v1
 
-- [ ] **ko-fi link in the settings page.** Copy the approach used for the
-  settings/companion pattern in `~/src/tidepebble` (`src/pkjs/settings.html` +
-  the generated `settings-html.js` wrapper, `open_config.js` dev helper).
+- [x] **ko-fi link in the settings page.** Done — `src/pkjs/settings.html`
+  (editable source) + generated `settings-html.js` wrapper + `src/open_config.js`
+  dev helper, same pattern as `~/src/tidepebble`. Static info page: tagline,
+  GitHub issues link, ko-fi button. `showConfiguration` opens it as a data: URI.
 - [ ] **Listing pass.** Store assets (icon sizes, banner, screenshots),
   description copy. Pull the battery guidance from `architecture.md` → "Battery
   guidance (for the store listing)" into the description.
 - [ ] Remove the diagnostic instrumentation (checklist above) before submitting.
-- [ ] Confirm `author` / `displayName` / `uuid` in `package.json` are what you
-  want on the store (`author` is currently `MakeAwesomeHappen`).
+- [x] `author` in `package.json` set to `ModusApps` (matches `~/src/tidepebble`).
+  Still confirm `displayName` (`legere`) / `uuid` before store submit.
 
 ## Research — done
 
@@ -111,8 +113,6 @@ is the grill session captured in `decisions.md`.
 
 - [ ] `README.md` still says "pebble-watchface" / generic boilerplate — rewrite
   it for legere (what it is, the shake mechanic, build steps).
-- [ ] `design/plain.png` is a superseded mockup — replace with a current render
-  or delete.
-- [ ] Uncommitted as of this doc: the `icon.png` keyline change. Commit it.
-- [ ] `resources/fonts/MichromaText.ttf` is now unused (locale work switched the
-  date row to `Michroma-Regular.ttf`). Delete it.
+- [x] `design/plain.png` superseded mockup — deleted.
+- [x] `icon.png` keyline change — committed (`4cb6c23`).
+- [x] `resources/fonts/MichromaText.ttf` unused since the locale work — deleted.

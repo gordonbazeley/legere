@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<!--
+  Editable source for the companion config page. pkjs loads the generated
+  string wrapper, not this file, so regenerate it after any edit:
+
+    node -e 'const fs=require("fs");fs.writeFileSync("src/pkjs/settings-html.js","module.exports = "+JSON.stringify(fs.readFileSync("src/pkjs/settings.html","utf8"))+";\n")'
+
+  Preview in a browser with:  node src/open_config.js
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>legere · Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Michroma&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --card: #151515;
+    --ink: #f2f2f2;
+    --gray: #9a9a9a;
+    --faint: #6a6a6a;
+    --line: #262626;
+    --accent: #3a86ff;
+    --pad: clamp(18px, 6vw, 26px);
+    --maxw: 520px;
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); }
+  body { color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+  .app { max-width: var(--maxw); margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
+  .hd { padding: calc(var(--sat) + 30px) var(--pad) 22px; border-bottom: 1px solid var(--line); }
+  .wordmark { font-family: "Michroma", sans-serif; font-size: clamp(22px, 7vw, 30px); letter-spacing: 2px; margin: 0; }
+  .tagline { color: var(--gray); font-size: 14px; margin: 12px 0 0; max-width: 36ch; }
+  .body { flex: 1 1 auto; padding: var(--pad); display: flex; flex-direction: column; gap: 16px; }
+  .seclabel { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--faint); margin: 6px 0 0 2px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: clamp(16px, 4.5vw, 20px); }
+  .card p { margin: 0 0 12px; color: var(--gray); font-size: 14px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .card a:active { text-decoration: underline; }
+  .kofi { display: inline-block; margin-top: 4px; }
+  .kofi img { height: 36px; width: auto; display: block; }
+  .foot { padding: 0 var(--pad) calc(24px + var(--sab)); color: var(--faint); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hd">
+    <h1 class="wordmark">legere</h1>
+    <p class="tagline">A quiet watchface. The minute reads as static until you shake your wrist to lock on.</p>
+  </header>
+  <main class="body">
+    <section>
+      <p class="seclabel">Feedback</p>
+      <div class="card">
+        <p>Found a bug or have a suggestion? Open an issue on GitHub <a href="https://github.com/gordonbazeley/legere/issues">here</a>.</p>
+      </div>
+    </section>
+    <section>
+      <p class="seclabel">Support</p>
+      <div class="card">
+        <p>legere is free and always will be. If it's earned a spot on your watch, you can say thanks with a coffee &mdash; entirely optional, hugely appreciated.</p>
+        <a class="kofi" href="https://ko-fi.com/gordonbazeley">
+          <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy me a coffee on Ko-fi" />
+        </a>
+      </div>
+    </section>
+  </main>
+  <p class="foot">legere &middot; watchface for Pebble</p>
+</div>
+</body>
+</html>

@@ -25,8 +25,14 @@
   on `tm_mday` change only.
 - Diagnostic log: `DayRecord` ring (14 days), per-hour shake counts + Quiet Time
   bitmask, in persist storage.
-- Log export: AppMessage → `src/pkjs/index.js` → CSV via Web Share / textarea;
-  and `APP_LOG` rows for `pebble logs` capture + `tools/pebble-log-to-csv.py`.
+- Log export: `APP_LOG` rows in the exact CSV shape, one per finished hour, for
+  `pebble logs` capture + `tools/pebble-log-to-csv.py`. (The old AppMessage →
+  pkjs → Web Share path is gone; the companion now only serves the settings
+  page. The watch-side `RequestLog` / `prv_outbox_*` handlers are still in
+  `legere.c`, now unreachable — on the removal checklist in `todo.md`.)
+- Companion settings page (`src/pkjs/settings.html`, generated string in
+  `settings-html.js`): info + GitHub issues + ko-fi link. No configurable
+  settings. Preview with `node src/open_config.js`.
 - Launcher icon (`resources/images/icon.png`) reads on any launcher background
   (white glyph + black keyline).
 - Builds via `pebble build`; `tools/strip-js-sourcemap.sh` drops the unused
@@ -43,8 +49,6 @@
   weekday+month abbreviations wouldn't fit at 21 (FR/ES, with "SEPT." + accented
   period-weekdays). Untested on real hardware with a non-English language pack.
 - **Temporary battery-% sampling** in `DayRecord` (Q17) — not added.
-- **ko-fi link** in the settings page — not added (copy the approach from
-  `~/src/tidepebble`).
 - **Store listing pass** — no store assets, description, or screenshots; the
   diagnostic instrumentation is still in.
 - **Hardware validation** of the `67ae9f5` overlap + dark-grey hour, especially
@@ -59,9 +63,11 @@
 - **Overlap digit collision.** ~30–40% of times have the hour digit's foot
   overpainted by the minute digit's head (e.g. `22:57`). Intentional; grey/white
   contrast carries it, but it's the main thing to sanity-check on hardware.
-- **`configurable` capability + AppMessage keys are load-bearing only for the
-  diagnostic export.** When the export is removed at store launch, decide
-  whether the companion stays (for the ko-fi page) or goes entirely.
+- **`configurable` capability stays** — it now backs the settings/ko-fi page.
+  The AppMessage message keys (`RequestLog` etc.) and the watch-side
+  `RequestLog` / `prv_outbox_*` handlers are load-bearing for nothing now
+  (pkjs stopped requesting the log) — remove them with the rest of the
+  diagnostic instrumentation at store launch.
 - **`prv_measure` uses a fixed 400×300 layout box.** Fine for the short strings
   used, but it is a text-layout call — keep it out of any redraw path (currently
   only `prv_window_load` calls it).
@@ -88,7 +94,10 @@
 | File | Role |
 |---|---|
 | `src/c/legere.c` | Entire watch app (~490 lines) |
-| `src/pkjs/index.js` | Phone companion: requests the log, builds CSV, Web Share / textarea (~85 lines) |
+| `src/pkjs/index.js` | Phone companion: opens the settings page on `showConfiguration` (~12 lines) |
+| `src/pkjs/settings.html` | Companion settings page — info + GitHub issues + ko-fi link (editable source) |
+| `src/pkjs/settings-html.js` | Generated CommonJS string of `settings.html`, loaded by pkjs — regen after editing the HTML |
+| `src/open_config.js` | Dev helper: serves `settings.html` on localhost for browser preview |
 | `package.json` | Pebble metadata, message keys, resources |
 | `wscript` | SDK build rules (unmodified) |
 | `resources/fonts/AlfaSlabOne-Regular.ttf` | Source for the digit sprite sheets |
@@ -101,4 +110,3 @@
 | `tools/quantize-alpha.py` | Quantises glyph-edge alpha to N even steps |
 | `tools/pebble-log-to-csv.py` | Pulls CSV rows out of a `pebble logs` capture |
 | `tools/strip-js-sourcemap.sh` | Drops `pebble-js-app.js.map` from the `.pbw` |
-| `design/plain.png` | Old single-line mockup — superseded, kept for reference |
