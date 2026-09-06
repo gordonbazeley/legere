@@ -318,13 +318,20 @@ static void prv_staticify(GContext *ctx, GRect r, int permille) {
 
 #define DATE_BOLD_PX 2   // faux-bold smear for the date row (Michroma has one weight)
 
+// Smears the glyph both ways so vertical and horizontal strokes thicken by the
+// same amount — an x-only smear (the old approach) only widens vertical
+// strokes, leaving horizontal ones their original weight and looking uneven.
 static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font,
                           GTextAlignment align, GColor color) {
   graphics_context_set_text_color(ctx, color);
-  for (int dx = 0; dx <= DATE_BOLD_PX; dx++) {
-    GRect b = box;
-    b.origin.x += dx;
-    graphics_draw_text(ctx, text, font, b, GTextOverflowModeFill, align, NULL);
+  graphics_draw_text(ctx, text, font, box, GTextOverflowModeFill, align, NULL);
+  for (int i = 1; i <= DATE_BOLD_PX; i++) {
+    GRect bx = box;
+    bx.origin.x += i;
+    graphics_draw_text(ctx, text, font, bx, GTextOverflowModeFill, align, NULL);
+    GRect by = box;
+    by.origin.y += i;
+    graphics_draw_text(ctx, text, font, by, GTextOverflowModeFill, align, NULL);
   }
 }
 
