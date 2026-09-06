@@ -4,7 +4,11 @@
 #include <string.h>
 
 static Window *s_window;
-static Layer *s_canvas_layer;
+// Two disjoint sibling layers so a repaint of one never re-runs the other's
+// update proc: the time digits change on every passive/forced repaint, the date
+// row only on a rollover or an s_exact flip.
+static Layer *s_digits_layer;
+static Layer *s_date_layer;
 
 // true  = a wrist shake forced an exact reading -> month drawn red
 // false = the minute is floored to a multiple of 5 (passive) -> month drawn blue
@@ -180,7 +184,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
 static void prv_shimmer_tick(void *context) {
   s_shimmer_timer = NULL;
   if (s_shimmer_left > 0) s_shimmer_left--;
-  layer_mark_dirty(s_canvas_layer);
+  layer_mark_dirty(s_digits_layer);  // snow only touches the minute row
   if (s_shimmer_left > 0) {
     s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
   }
@@ -198,7 +202,8 @@ static void prv_refresh_to_exact(void) {
   s_shimmer_left = SHIMMER_FRAMES;
   if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
   s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
-  layer_mark_dirty(s_canvas_layer);
+  layer_mark_dirty(s_digits_layer);  // minute row: snow -> clean
+  layer_mark_dirty(s_date_layer);    // month colour: blue -> red
 }
 
 // Recolour a digit by poking the sheet's palette — tint every visible palette
@@ -260,22 +265,18 @@ static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font
   }
 }
 
-static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
+// Cached date-row strings: strftime + the uppercase pass only re-run on a date
+// change, not on every passive repaint. -1 = not built yet.
+static char s_dow[4], s_dom[4], s_mon[4];
+static int s_str_mday = -1;
+
+static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
 
   bool h24 = clock_is_24h_style();
   int hour = prv_display_hour(t);
   int disp_min = s_exact ? t->tm_min : prv_floor5(t->tm_min);
-
-  char hour_str[4], min_str[4], dow[4], dom[4], mon[4];
-  snprintf(hour_str, sizeof hour_str, h24 ? "%02d" : "%d", hour);
-  snprintf(min_str, sizeof min_str, "%02d", disp_min);
-  strftime(dow, sizeof dow, "%a", t);
-  strftime(dom, sizeof dom, "%d", t);
-  strftime(mon, sizeof mon, "%b", t);
-  for (char *c = dow; *c; c++) *c = toupper((unsigned char)*c);
-  for (char *c = mon; *c; c++) *c = toupper((unsigned char)*c);
 
   // Hour and minute stacked: two digits per row, the pair centred as a unit so a
   // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
@@ -315,6 +316,9 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
     if (minutes_snow) prv_staticify(ctx, min_rect);
   } else {
     // Resource-load failure only: fall back to plain text.
+    char hour_str[4], min_str[4];
+    snprintf(hour_str, sizeof hour_str, h24 ? "%02d" : "%d", hour);
+    snprintf(min_str, sizeof min_str, "%02d", disp_min);
     GFont f = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
     prv_draw_cell(ctx, GRect(s_pad, s_digit_band_top, s_usable_w, 48),
                   hour_str, f, GTextAlignmentRight, GColorWhite);
@@ -322,20 +326,35 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
                   min_str, f, GTextAlignmentRight, GColorWhite);
   }
 
-  // Date row: weekday left, day-of-month centre, month right — three L/C/R
-  // strings over one shared box (Michroma is too wide to force equal thirds and
-  // stay legible). Month colour signals freshness: red = exact (just refreshed),
-  // blue = passive 5-minute reading.
-  // Bright blue: darker blues are unreadable on the transflective LCD unlit.
-  GColor mon_color = s_exact ? GColorRed : GColorElectricBlue;
-  int date_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
-  GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, s_date_top, date_w, s_date_h);
-  prv_draw_cell(ctx, date_box, dow, s_date_font, GTextAlignmentLeft, GColorWhite);
-  prv_draw_cell(ctx, date_box, dom, s_date_font, GTextAlignmentCenter, GColorWhite);
-  prv_draw_cell(ctx, date_box, mon, s_date_font, GTextAlignmentRight, mon_color);
-
   s_drawn_hour = hour;
   s_drawn_min = disp_min;
+}
+
+// Date row: weekday left, day-of-month centre, month right — three L/C/R strings
+// over one shared box (Michroma is too wide to force equal thirds and stay
+// legible). Month colour signals freshness: red = exact (just refreshed), blue =
+// passive 5-minute reading. Bright blue: darker blues are unreadable on the
+// transflective LCD unlit. The box is layer-relative (y = 0): s_date_layer is
+// framed at s_date_top.
+static void prv_date_update_proc(Layer *layer, GContext *ctx) {
+  time_t now = time(NULL);
+  struct tm *t = localtime(&now);
+
+  if (t->tm_mday != s_str_mday) {
+    strftime(s_dow, sizeof s_dow, "%a", t);
+    strftime(s_dom, sizeof s_dom, "%d", t);
+    strftime(s_mon, sizeof s_mon, "%b", t);
+    for (char *c = s_dow; *c; c++) *c = toupper((unsigned char)*c);
+    for (char *c = s_mon; *c; c++) *c = toupper((unsigned char)*c);
+    s_str_mday = t->tm_mday;
+  }
+
+  GColor mon_color = s_exact ? GColorRed : GColorElectricBlue;
+  int date_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
+  GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
+  prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, GColorWhite);
+  prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, GColorWhite);
+  prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, mon_color);
 }
 
 // ponytail stopgap: the official Pebble app doesn't surface a Settings
@@ -391,10 +410,16 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // rollover stay covered.
   int step = quiet ? 60 : 5;
   if (tick_time->tm_min % step == 0) {
+    bool was_exact = s_exact;
     s_exact = false;
     s_sched_hour = tick_time->tm_hour;
     s_sched_min = tick_time->tm_min;
-    layer_mark_dirty(s_canvas_layer);
+    layer_mark_dirty(s_digits_layer);
+    // Date row only moves on a rollover (new mday) or when a prior shake's
+    // exact reading expires here (month red -> blue).
+    if (was_exact || tick_time->tm_mday != s_str_mday) {
+      layer_mark_dirty(s_date_layer);
+    }
   }
 }
 
@@ -477,14 +502,21 @@ static void prv_window_load(Window *window) {
 
   s_digit_band_top = top_margin;
 
-  s_canvas_layer = layer_create(bounds);
-  layer_set_update_proc(s_canvas_layer, prv_canvas_update_proc);
-  layer_add_child(window_layer, s_canvas_layer);
+  // Digits above, date below, split at s_date_top so the two dirty regions never
+  // intersect — marking one never re-runs the other's update proc.
+  s_digits_layer = layer_create(GRect(0, 0, bounds.size.w, s_date_top));
+  layer_set_update_proc(s_digits_layer, prv_digits_update_proc);
+  layer_add_child(window_layer, s_digits_layer);
+
+  s_date_layer = layer_create(GRect(0, s_date_top, bounds.size.w, s_date_h));
+  layer_set_update_proc(s_date_layer, prv_date_update_proc);
+  layer_add_child(window_layer, s_date_layer);
 }
 
 static void prv_window_unload(Window *window) {
   if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
-  layer_destroy(s_canvas_layer);
+  layer_destroy(s_digits_layer);
+  layer_destroy(s_date_layer);
   for (int i = 0; i < 10; i++) {
     if (s_digit[i]) gbitmap_destroy(s_digit[i]);
   }

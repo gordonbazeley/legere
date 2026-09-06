@@ -20,14 +20,25 @@ is the grill session captured in `decisions.md`.
 
 ## Power hygiene (the real lever — see `architecture.md` → Power model)
 
-- [ ] **Digit block on its own layer.** Split the time digits out of
-  `s_canvas_layer` into a child layer; `layer_mark_dirty` only that on a passive
-  or forced repaint. The date row rarely changes — its own layer, marked dirty
-  only on date rollover / `s_exact` flip.
-- [ ] **Cache formatted strings.** Build `hour_str` / `min_str` / `dow` / `dom` /
-  `mon` only when the underlying value changes, not every
-  `prv_canvas_update_proc`. Keep `graphics_text_layout_get_content_size` off the
-  redraw path (it already is — don't regress it).
+- [x] **Digit block on its own layer.** Done — `s_digits_layer` (0..`s_date_top`)
+  and `s_date_layer` (`s_date_top`..) are disjoint, so marking one never re-runs
+  the other's update proc. Shimmer ticks mark digits only; the passive grid tick
+  marks the date only on a rollover / `s_exact` flip; a forced-exact refresh
+  marks both.
+- [x] **Cache formatted strings.** Done — the date strings (`s_dow` / `s_dom` /
+  `s_mon`) rebuild only when `tm_mday` changes (`s_str_mday`). `hour_str` /
+  `min_str` are now built only in the resource-failure fallback branch (the
+  normal path uses the `dv[]` int digits). `graphics_text_layout_get_content_size`
+  stays in `prv_window_load` only.
+- [ ] **(maybe) Hour digits on their own layer.** Split the hour row out of
+  `s_digits_layer` so a minute-only repaint (every passive grid tick except
+  `:00`, every shimmer frame, every forced-exact refresh) skips the 2 hour-digit
+  blits. Estimated saving ~10 nA average (≈ 1 s of battery life over 21 days) —
+  below noise, so this is a "only if the render profile ever matters" note, not a
+  real todo. Caveats: on emery `DIGIT_GAP = -20` overlaps the rows, so the minute
+  dirty region drags the hour layer's update proc back in for the overlap strip;
+  and `prv_staticify`'s `min_rect` coords get more fragile. Needs an hour-digit /
+  hour-string cache and `:00` dirty-tracking.
 
 ## Locale (Latin-script scope — see `decisions.md`)
 

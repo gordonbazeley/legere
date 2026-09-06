@@ -22,9 +22,10 @@ tick (every minute, from the OS)
 shake / tap  ──┐
 backlight on ──┼── force an exact repaint (s_exact = true), unless nothing would change
                │
-        prv_canvas_update_proc
+        prv_digits_update_proc  (s_digits_layer)
           ├── hour digits  (bitmap blits, GColorDarkGray, always)
-          ├── minute digits(bitmap blits, LightGray when passive / White when exact)
+          └── minute digits(bitmap blits, LightGray when passive / White when exact)
+        prv_date_update_proc    (s_date_layer — only marked dirty on rollover / s_exact flip)
           └── date row     (weekday / day / month; month blue=passive, red=exact)
 ```
 
@@ -128,9 +129,12 @@ legere's controllable levers, in full:
 1. Load bitmaps/fonts once in `prv_window_load`, never per-redraw — **done**.
 2. Keep `graphics_text_layout_get_content_size` (`prv_measure`) off the redraw
    path — **done** (only called in `prv_window_load`).
-3. `mark_dirty` only the layer that changed, not the whole window — **todo**
-   (currently one full-bounds `s_canvas_layer`).
-4. Cache the formatted time/date strings, re-render on change only — **todo**.
+3. `mark_dirty` only the layer that changed, not the whole window — **done**
+   (`s_digits_layer` / `s_date_layer` are disjoint; the date is repainted only on
+   a rollover or an `s_exact` flip, shimmer ticks touch the digits layer only).
+4. Cache the formatted time/date strings, re-render on change only — **done**
+   (date strings keyed on `tm_mday` via `s_str_mday`; `hour_str`/`min_str` moved
+   into the resource-failure fallback).
 
 The 5-minute grid saves an estimated ~6–26 µA (≈ under one day over 21) — real
 but a rounding error. It is kept as an identity choice, not a power play.

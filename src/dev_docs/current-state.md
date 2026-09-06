@@ -18,6 +18,9 @@
 - 12/24h from the system (`clock_is_24h_style`).
 - Repaint skipped whenever it would not change the screen (`s_drawn_hour` /
   `s_drawn_min`).
+- Digits and date on disjoint layers (`s_digits_layer` / `s_date_layer`); each
+  marked dirty only when its own content changes. Date strings cached, rebuilt
+  on `tm_mday` change only.
 - Diagnostic log: `DayRecord` ring (14 days), per-hour shake counts + Quiet Time
   bitmask, in persist storage.
 - Log export: AppMessage → `src/pkjs/index.js` → CSV via Web Share / textarea;
@@ -33,9 +36,6 @@
   capture works on gabbro's 8-bit format) but only tested on emery. Check the
   snow reads at the smaller 58×62 slot and that the minute-row rect is right on
   round.
-- **Power-hygiene pass.** The digit block is not on its own layer; the whole
-  `s_canvas_layer` (full bounds) is marked dirty every repaint. Formatted
-  time/date strings are rebuilt every `prv_canvas_update_proc` call.
 - **Locale.** No `setlocale()` call — `strftime` runs in the C locale, always
   English. Date font subset is `[A-Z0-9 ]`; `toupper` is ASCII-only. "Locale
   from system settings" is a stated goal, not wired.
@@ -64,7 +64,7 @@
   only `prv_window_load` calls it).
 - **`s_date_font` fallback.** If the custom font fails to load, falls back to
   `FONT_KEY_GOTHIC_14_BOLD` and `s_date_font_custom` guards the unload. The
-  digit sheet has no equivalent fallback — `prv_canvas_update_proc` draws plain
+  digit sheet has no equivalent fallback — `prv_digits_update_proc` draws plain
   `FONT_KEY_LECO_42_NUMBERS` text if `s_sheet` is NULL.
 - No automated tests.
 
@@ -84,7 +84,7 @@
 
 | File | Role |
 |---|---|
-| `src/c/legere.c` | Entire watch app (~467 lines) |
+| `src/c/legere.c` | Entire watch app (~490 lines) |
 | `src/pkjs/index.js` | Phone companion: requests the log, builds CSV, Web Share / textarea (~85 lines) |
 | `package.json` | Pebble metadata, message keys, resources |
 | `wscript` | SDK build rules (unmodified) |
