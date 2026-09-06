@@ -55,7 +55,7 @@ static AppTimer *s_shimmer_timer = NULL;
 // Ceiling on passive snow density, in permille of the minute-ink pixels — dialed
 // back from a full 1000 (every pixel) so the passive face reads as static
 // without being quite so agitated.
-#define PASSIVE_SNOW_PERMILLE 700
+#define PASSIVE_SNOW_PERMILLE 450
 
 // Snow density for the current frame, in permille of the minute-ink pixels:
 // PASSIVE_SNOW_PERMILLE = passive / no signal, 0 = clean. A ramp in flight wins
