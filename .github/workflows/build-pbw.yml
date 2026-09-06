@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -37,3 +39,21 @@ jobs:
           name: legere-pbw
           path: build/*.pbw
           if-no-files-found: error
+
+      # Actions artifacts live on Azure Blob Storage, which not every fetcher
+      # can reach. Also publish the .pbw as a plain git commit on an orphan
+      # branch so it's retrievable with nothing but `git fetch`.
+      - name: Publish .pbw to pbw-latest branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -e
+          mkdir -p /tmp/pbw-out
+          cp build/*.pbw /tmp/pbw-out/
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan pbw-latest
+          git rm -rf . > /dev/null
+          cp /tmp/pbw-out/*.pbw .
+          git add -- *.pbw
+          git commit -m "Build .pbw from ${GITHUB_SHA}"
+          git push origin HEAD:pbw-latest --force
