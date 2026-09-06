@@ -2,10 +2,11 @@
 
 ## What works
 
-- Stacked hour/minute digits on `emery` (200×228) and `gabbro` (260×260 round;
-  layout still sized for 180 — see below),
+- Stacked hour/minute digits on `emery` (200×228) and `gabbro` (260×260 round),
   pre-rendered from Alfa Slab One via `tools/gen-digits.sh`.
 - Emery: digits 93×103, minute row overlapping the hour row −20px, hour row
+  `GColorDarkGray`.
+- Gabbro: digits 73×80, rows a positive 6px apart, centred; hour row
   `GColorDarkGray`.
 - Passive 5-minute repaint grid; hourly during Quiet Time.
 - Wrist shake / tap (daylight) and backlight-on (dark) force an exact-minute
@@ -33,11 +34,6 @@
 
 ## Not done yet — see `todo.md`
 
-- **gabbro layout tuned for 180, not 260.** gabbro is 260×260 round; the layout
-  constants (`grid_w = 132`, paddings, 58×62 digit sheet) were built for 180.
-  Renders fine but the digits are small (~45% width) with a dead strip above the
-  date. Retune + bigger sprite sheet — see `todo.md`. (Static itself is
-  verified working on gabbro.)
 - **Locale — mostly wired (Latin-script scope).** `prv_init` calls
   `setlocale(LC_ALL, i18n_get_system_locale())`; `strftime %a/%b` then follow the
   installed language pack (English if none). `prv_utf8_upper` uppercases ASCII +
@@ -97,7 +93,7 @@
 | `wscript` | SDK build rules (unmodified) |
 | `resources/fonts/AlfaSlabOne-Regular.ttf` | Source for the digit sprite sheets |
 | `resources/fonts/Michroma-Regular.ttf` | Date row font (`FONT_DATE_14` on gabbro; `FONT_DATE_21` or `_18` on emery, picked at load) |
-| `resources/images/digits.png` | gabbro sprite sheet — slot 58×62 |
+| `resources/images/digits.png` | gabbro sprite sheet — slot 73×80 |
 | `resources/images/digits_lg.png` | emery sprite sheet — slot 93×103 |
 | `resources/images/icon.png` | Launcher icon, 25×25, white glyph + black keyline |
 | `tools/gen-digits.sh` | Regenerates the sprite sheets from the TTF |

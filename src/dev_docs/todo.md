@@ -17,13 +17,14 @@ is the grill session captured in `decisions.md`.
   the minute row snowed, hour stays solid dark grey, nothing bleeds into the
   date row. `prv_staticify`'s per-row `gbitmap_get_data_row_info` clamping is
   what makes it round-safe.
-- [ ] **Retune the gabbro layout for 260×260.** gabbro is 260×260 round, not the
-  180 the layout was built for (`grid_w = 132`, `PAD 18`, `top_margin 16` /
-  `bot_margin 22`, `digits.png` 58×62 slot all assume 180). On 260 the digits
-  fill ~45% of the width and the block sits high with a ~47px dead strip between
-  the minute row and the date. Bump `grid_w`, regenerate a bigger `digits`
-  sheet in `tools/gen-digits.sh` (currently `66 62`), and recentre. Not urgent —
-  it reads fine, just small.
+- [x] **Retune the gabbro layout for 260×260.** Done — `digits` sheet regenerated
+  at `88 80` (slot 73×80, was 58×62); round constants moved off the 180 values:
+  `PAD 20`, `DIGIT_GAP 6`, `DIGIT_BAND_BOT_GAP 6`, `top_margin 28`,
+  `bot_margin 32`, `grid_w` now `= s_usable_w`, round `date_w 174`. Digits fill
+  ~56% width, dead strip gone, block vertically balanced. Verified in the gabbro
+  emulator (passive static, shake-to-exact, date clears the arc). Emery
+  unchanged. Still worth a hardware glance for arc clearance on the date row and
+  digit legibility unlit.
 - [x] **Validate the overlap + dark-grey hour on hardware.** `67ae9f5` is
   unvalidated. Check dark-grey-on-black legibility unlit and the digit
   foot/head collision on `22:57` / `12:38` / `08:07`. If the hour is too dim,

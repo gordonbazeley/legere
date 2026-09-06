@@ -47,11 +47,11 @@ static int s_date_h;
 static int s_pad;
 static int s_usable_w;
 
-#define PAD PBL_IF_ROUND_ELSE(18, 6)
+#define PAD PBL_IF_ROUND_ELSE(20, 6)
 // px between the hour and minute rows; negative on emery = the minute row
 // deliberately overlaps the hour row (dense stacked effect, hour drawn dark).
-#define DIGIT_GAP PBL_IF_ROUND_ELSE(4, -20)
-#define DIGIT_BAND_BOT_GAP PBL_IF_ROUND_ELSE(4, 5)  // px between the minute row and the date row
+#define DIGIT_GAP PBL_IF_ROUND_ELSE(6, -20)
+#define DIGIT_BAND_BOT_GAP PBL_IF_ROUND_ELSE(6, 5)  // px between the minute row and the date row
 
 static GSize prv_measure(const char *text, GFont font) {
   return graphics_text_layout_get_content_size(text, font, GRect(0, 0, 400, 300),
@@ -348,17 +348,17 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
   // so the minute row overlaps and paints over the foot of the dark-grey hour
   // row — a deliberate dense stack that buys bigger digits. The whole block is
-  // centred in the space above the date. On the round display the grid is
-  // pulled in from both edges so its corners clear the bezel, and the rows keep
-  // a normal positive gap.
+  // centred in the space above the date. On gabbro the block sits at the
+  // vertical mid-screen (the widest part of the circle), so it spans the full
+  // usable width and the rows keep a normal positive gap.
   //
   // The minute row is drawn solid white, then (when the reading is passive, or
   // mid lock-on flicker) prv_staticify() turns that white ink into snow. The
   // hour is always exact, so it stays a solid dark grey and never flickers.
   bool minutes_snow = !s_exact || s_shimmer_left > 0;
   if (s_sheet) {
-    int grid_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
-    int grid_x = s_pad + (s_usable_w - grid_w) / 2;
+    int grid_w = s_usable_w;
+    int grid_x = s_pad;
     int block_h = 2 * s_slot_h + DIGIT_GAP;
     int block_top = s_digit_band_top + PBL_IF_ROUND_ELSE(2, 0) +
                     (s_date_top - DIGIT_BAND_BOT_GAP - s_digit_band_top - block_h) / 2;
@@ -416,7 +416,7 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   }
 
   GColor mon_color = s_exact ? GColorRed : GColorElectricBlue;
-  int date_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
+  int date_w = PBL_IF_ROUND_ELSE(174, s_usable_w);  // round: narrower than usable so the row clears the arc
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
   prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, GColorWhite);
   prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, GColorWhite);
@@ -530,7 +530,7 @@ static void prv_window_load(Window *window) {
   // Rect (Emery) top_margin doubles as the literal margin above the digit
   // block (see s_date_top below) — round keeps its bot_margin-anchored,
   // bezel-tuned layout untouched.
-  int top_margin = PBL_IF_ROUND_ELSE(16, 5);
+  int top_margin = PBL_IF_ROUND_ELSE(28, 5);
 
 #if defined(PBL_PLATFORM_EMERY)
   s_date_font = prv_pick_date_font();   // 21px, or 18px where the locale is too wide
@@ -562,7 +562,7 @@ static void prv_window_load(Window *window) {
   // 5px instead of splitting leftover slack between them.
   s_date_top = top_margin + 2 * s_slot_h + DIGIT_GAP + DIGIT_BAND_BOT_GAP;
 #else
-  int bot_margin = PBL_IF_ROUND_ELSE(22, 2);  // round only; bezel-tuned
+  int bot_margin = PBL_IF_ROUND_ELSE(32, 2);  // round only; bezel-tuned
   s_date_top = bounds.size.h - bot_margin - s_date_h;
 #endif
 
