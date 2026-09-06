@@ -15,8 +15,8 @@ static Layer *s_date_layer;
 // false = the minute is floored to a multiple of 5 (passive, minute digits snow)
 static bool s_exact = false;
 
-// Minute shown while passive. Normally kept on the 5-minute grid (or hourly in
-// Quiet Time) by prv_tick_handler's scheduled resync below, but the moment an
+// Minute shown while passive. Normally kept on the 5-minute grid (Quiet Time
+// or not) by prv_tick_handler's scheduled resync below, but the moment an
 // exact reading expires it's pinned at that real (unfloored) minute instead of
 // jumping back to the grid mark before it — so a shake at :33 that expires at
 // :34 shows a static "34", not a static "30". It re-syncs to the grid at the
@@ -544,11 +544,11 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   }
 
   // The OS wakes the app every minute for its own clock; we only repaint on the
-  // 5-minute grid — and just hourly while the user's Quiet Time is on (asleep or
-  // in a meeting). :00 and midnight are multiples of both, so hour and date
-  // rollover stay covered.
-  int step = quiet ? 60 : 5;
-  if (tick_time->tm_min % step == 0) {
+  // 5-minute grid, Quiet Time or not — a redraw is cheap, so there's no reason
+  // to fall back to hourly while the user's Quiet Time is on (asleep or in a
+  // meeting). Shake-to-wake stays blocked during Quiet Time regardless, since
+  // that's the OS's own backlight behaviour, untouched by this handler.
+  if (tick_time->tm_min % 5 == 0) {
     s_exact = false;
     s_passive_min = tick_time->tm_min;  // already grid-aligned here - resync point
     s_sched_hour = tick_time->tm_hour;
@@ -567,7 +567,7 @@ static void prv_backlight_handler(bool on) {
   if (!on) return;
 
   // In Quiet Time, a button press (e.g. Back, exiting some other screen back
-  // to the face) still wants the exact time — but if the passive hourly
+  // to the face) still wants the exact time — but if the passive grid
   // repaint already landed in this same minute, forcing an exact/red redraw
   // now would just flash the screen for no visible change. Skip it.
   if (quiet_time_is_active()) {

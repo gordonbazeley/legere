@@ -2,9 +2,11 @@
 
 ## The 5-minute grid is an identity choice, not a power optimisation
 
-**Chose:** Keep the passive 5-minute repaint grid (hourly during Quiet Time) as a
-defining feature of the face — "the minutes are soft unless you ask" — and stop
-framing legere as a "lowest-power" watchface.
+**Chose:** Keep the passive 5-minute repaint grid — the same cadence during
+Quiet Time as any other time, no hourly fallback (see "Quiet Time keeps the
+same 5-minute grid" below) — as a defining feature of the face — "the minutes
+are soft unless you ask" — and stop framing legere as a "lowest-power"
+watchface.
 
 **Why it changed:** The original thesis (commit `89c0224`, "low-power TTMM-style
 face") assumed the redraw cadence was a meaningful battery lever. Researched
@@ -24,6 +26,26 @@ nothing wasteful," not a promise.
 repebble.com "Pebble Time 2 Is In Mass Production", developer.repebble.com
 "Conserving Battery Life", help.repebble.com battery article,
 forum.repebble.com/t/hows-your-battery-life/576, cnx-software SF32LB52J writeup.
+
+## Quiet Time keeps the same 5-minute grid, no hourly fallback
+
+**Chose:** Repaint on the 5-minute grid during Quiet Time too, instead of
+falling back to hourly (`prv_tick_handler`'s `step` collapses from
+`quiet ? 60 : 5` to a flat `5`).
+
+**Why:** Follows directly from the decision above — once the grid is framed
+as identity rather than a power lever, there's no reason to let the face go
+up to 59 minutes stale specifically while Quiet Time is on. The static/
+shimmer repaint (`prv_staticify`'s framebuffer capture) is the more expensive
+part of a redraw here, but it already runs at the 5-minute cadence during
+normal hours without being a measurable concern (see above) — running it
+5x more often during Quiet Time's typically-asleep hours doesn't change that
+math. Shake-to-wake stays blocked during Quiet Time regardless — that's the
+OS's own backlight behaviour, untouched by this handler — so this only
+affects how stale the face looks if glanced at without waking the backlight.
+
+**Trade-off:** None identified beyond the redraw-cost point above, which the
+existing power research already covers.
 
 ## No A/B control build to measure the grid
 
@@ -180,6 +202,28 @@ check while the face is finished.
 `Battery`, `QuietMask`, `Done`) and the `configurable` capability come back out of
 `package.json` when the export goes — unless the ko-fi settings page keeps a
 companion around, in which case the export code goes but the plumbing stays.
+
+## The phone-side CSV skips hours with no data, instead of dumping the whole day
+
+**Chose:** `openPage()` in `src/pkjs/index.js` now skips any hour whose
+`battery` sample is still `255` before writing CSV rows, instead of writing
+all 24 hours of every persisted day unconditionally.
+
+**Why:** `battery[24]` is sampled every minute (`prv_tick_handler`), so `255`
+means that hour of the day hasn't happened yet — true for the rest of
+today's in-progress record, which the export always includes (see above).
+Before this, opening the settings page any time before 23:00 produced a CSV
+with a placeholder row for every hour later than "now" — `shakes` 0, `battery`
+blank, `quiet_hour` `no` — indistinguishable from a real quiet hour with no
+shakes. Writing the whole (mostly future) day's rows in one pass on every
+`openPage()` call was also the actual "write log lines … for the whole day
+at one time" behaviour this was meant to avoid — the watch-side `APP_LOG`
+path (above) already only ever writes one real row per finished hour.
+
+**Trade-off:** None identified — the skip only removes rows that carried no
+real information; nothing downstream (the settings page's textarea/Share,
+`tools/pebble-log-to-csv.py`) parses the CSV shape, so nothing depended on the
+old placeholder rows being present.
 
 ## Platforms: emery + gabbro only
 

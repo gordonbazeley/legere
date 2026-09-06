@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Quiet Time no longer falls back to an hourly repaint grid — the face
+  redraws on the same 5-minute grid whether Quiet Time is on or not.
+  Shake-to-wake stays blocked during Quiet Time as before.
+- The phone settings-page diagnostic log no longer writes a placeholder row
+  for hours later than "now" on the still-in-progress day (previously shown
+  as `shakes` 0, `battery` blank) — only hours that have actually happened
+  get a row.
 - Shake-log CSV and phone settings-page log now list newest day/hour first
   instead of oldest.
 - Date row is now a hardcoded solid white instead of a mid-blue tint, and

@@ -25,10 +25,10 @@ function openPage() {
   days.forEach(function (d) {
     var date = pad2(d.mday) + '/' + pad2(d.mon) + '/' + d.year;
     for (var h = 23; h >= 0; h--) {
-      var quiet = (d.quietMask & (1 << h)) ? 'yes' : 'no';
       var bat = d.battery[h];
-      rows.push(date + ',' + pad2(h) + ',' + quiet + ',' + d.shakes[h] + ',' +
-                (bat === 255 ? '' : bat));
+      if (bat === 255) continue;  // hour hasn't happened yet (no battery sample) — no placeholder row
+      var quiet = (d.quietMask & (1 << h)) ? 'yes' : 'no';
+      rows.push(date + ',' + pad2(h) + ',' + quiet + ',' + d.shakes[h] + ',' + bat);
     }
   });
 

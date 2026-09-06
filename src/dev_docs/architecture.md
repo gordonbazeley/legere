@@ -19,7 +19,7 @@ Single-file watch app. The phone companion is just a static settings page
 tick (every minute, from the OS)
   ├── advance the day-record ring, sample Quiet Time flag
   ├── if a forced-exact reading's minute has ticked over: clear s_exact, repaint
-  ├── on the 5-minute grid (hourly during Quiet Time): mark dirty, passive repaint
+  ├── on the 5-minute grid (Quiet Time or not): mark dirty, passive repaint
   │
 shake / tap  ──┐
 backlight on ──┼── force an exact repaint (s_exact = true), unless nothing would change
@@ -129,15 +129,15 @@ ramp's final `prv_shimmer_tick` clears `s_exact`.
 ## Repaint schedule (`prv_tick_handler`)
 
 The OS wakes the app every minute for its own clock. legere repaints only when
-`tm_min % step == 0`, where `step` is **5** normally and **60** during Quiet
-Time. `:00` and midnight are multiples of both, so hour and date rollover stay
-covered. During Quiet Time the face can therefore be up to ~59 minutes stale —
-accepted, because a deliberate look lights the backlight, which forces an exact
-repaint (`prv_backlight_handler`).
+`tm_min % 5 == 0`, Quiet Time or not (see `decisions.md` → "Quiet Time keeps
+the same 5-minute grid, no hourly fallback") — `:00` and midnight are
+multiples of 5, so hour and date rollover stay covered. A deliberate look
+still lights the backlight, which forces an exact repaint
+(`prv_backlight_handler`), regardless of how fresh the passive grid already is.
 
 Forced-exact paths:
 - **`prv_backlight_handler`** — backlight on (button in the dark, flick-to-light).
-  Stays live during Quiet Time, but skips if the passive hourly repaint already
+  Stays live during Quiet Time, but skips if the passive grid repaint already
   landed in this same minute (`s_sched_hour`/`s_sched_min`).
 - **`prv_tap_handler`** — wrist flick/tap in daylight (when the backlight
   wouldn't fire). Suppressed entirely during Quiet Time (a sleeping wrist
@@ -202,7 +202,8 @@ per-hour shake-trigger counts, a Quiet Time bitmask, and per-hour battery
 `charge_percent` (`battery[24]`, `0xFF` = no sample; last member so pre-battery
 32 B blobs still read back cleanly). Battery is sampled on the same hourly path
 as the Quiet Time flag. CSV columns: `date,hour,quiet_hour,shakes,battery`
-(battery integer percent, blank if unsampled). Two export paths:
+(battery integer percent). Two export paths, both hour-by-hour — neither
+ever writes a row for an hour that hasn't happened yet:
 
 - **`APP_LOG` rows** in the exact CSV shape, emitted **only when an hour
   finishes** (the first tick of the next hour, `prv_tick_handler`). The
@@ -213,7 +214,11 @@ as the Quiet Time flag. CSV columns: `date,hour,quiet_hour,shakes,battery`
   section (CSV + Web Share / textarea). `prv_inbox_received_handler` catches
   `RequestLog` and `prv_export_send_next` streams every non-empty persist slot,
   **including today's partial record** (created + persisted by the first tick
-  after midnight), paced by `prv_outbox_sent_handler`, then `Done`.
+  after midnight), paced by `prv_outbox_sent_handler`, then `Done`. `openPage()`
+  in `index.js` then skips any hour whose `battery` sample is still `255` (the
+  init value — meaning that hour hasn't happened yet on the in-progress day)
+  before building the CSV, so the exported log never has placeholder rows for
+  the rest of today.
 
 Note both paths read persist storage, which `pebble install` **wipes** — after a
 reinstall there is no history, only what has accrued since.

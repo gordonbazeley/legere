@@ -8,7 +8,7 @@
   `GColorDarkGray`.
 - Gabbro: digits 73×80, rows a positive 6px apart, centred; hour row
   `GColorDarkGray`.
-- Passive 5-minute repaint grid; hourly during Quiet Time.
+- Passive 5-minute repaint grid, Quiet Time or not (no hourly fallback).
 - Wrist shake / tap (daylight) and backlight-on (dark) force an exact-minute
   repaint; `prv_refresh_to_exact` no-ops if the exact time is already shown.
 - Quiet Time suppresses the tap path; the backlight path stays live but skips a
@@ -31,16 +31,18 @@
 - Diagnostic log: `DayRecord` ring (14 days), per-hour shake counts + Quiet Time
   bitmask + battery `charge_percent` (`0xFF` = no sample), in persist storage.
   `battery[24]` is last in the struct so pre-battery 32-byte blobs still read
-  back cleanly. CSV gains a `battery` column (integer percent, blank if no
-  sample).
-- Log export, two paths (both temporary, out at store launch):
+  back cleanly. CSV gains a `battery` column (integer percent).
+- Log export, two paths (both temporary, out at store launch), both hour-by-
+  hour — neither ever writes a row for an hour that hasn't happened yet:
   - **`APP_LOG` rows** in the exact CSV shape, one per *finished* hour —
     `pebble logs` capture + `tools/pebble-log-to-csv.py`. The in-progress hour
     is never logged; earlier hours only appear if capture was running at each
     hour boundary.
   - **AppMessage** → `src/pkjs/index.js` → the settings page's "Diagnostic
     log" section (CSV + Web Share / textarea). Sends every persisted
-    `DayRecord` slot including today's partial one.
+    `DayRecord` slot including today's partial one, but `openPage()` skips
+    any hour whose `battery` sample is still `255` before building the CSV —
+    so today's still-to-come hours never show up as placeholder rows.
 - Companion settings page (`src/pkjs/settings.html`, generated string in
   `settings-html.js`): a temporary diagnostic-log section (above), then info +
   GitHub issues + ko-fi link. No configurable settings. Preview with
