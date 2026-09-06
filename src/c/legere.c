@@ -1,5 +1,6 @@
 #include <pebble.h>
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 static Window *s_window;
@@ -25,6 +26,14 @@ static int s_slot_h;
 // nothing can skip the redraw entirely.
 static int s_drawn_hour = -1;
 static int s_drawn_min = -1;
+
+// Passive minutes are drawn as TV-static "snow" (see prv_staticify). A shake
+// resolves them to a clean signal — but first runs a short "locking on" flicker:
+// SHIMMER_FRAMES redraws of fresh snow, SHIMMER_MS apart, then the clean render.
+#define SHIMMER_FRAMES 5
+#define SHIMMER_MS 55
+static int s_shimmer_left = 0;         // >0 while the lock-on flicker is playing
+static AppTimer *s_shimmer_timer = NULL;
 
 static int s_digit_band_top; // top y of the digit grid
 static int s_date_top;       // y of the date row
@@ -165,6 +174,18 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
   }
 }
 
+// One frame of the lock-on flicker: count down and repaint. While s_shimmer_left
+// is > 0 the minutes still render as snow (freshly randomised each frame); the
+// frame that lands on 0 renders the clean exact time.
+static void prv_shimmer_tick(void *context) {
+  s_shimmer_timer = NULL;
+  if (s_shimmer_left > 0) s_shimmer_left--;
+  layer_mark_dirty(s_canvas_layer);
+  if (s_shimmer_left > 0) {
+    s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
+  }
+}
+
 // Refresh to the exact minute (and flag it red) unless that's already on screen.
 static void prv_refresh_to_exact(void) {
   time_t now = time(NULL);
@@ -174,6 +195,9 @@ static void prv_refresh_to_exact(void) {
   }
   prv_log_trigger(t);
   s_exact = true;
+  s_shimmer_left = SHIMMER_FRAMES;
+  if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
+  s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
   layer_mark_dirty(s_canvas_layer);
 }
 
@@ -197,6 +221,31 @@ static void prv_set_ink(GBitmap *b, GColor c) {
       pal[i].b = c.b;
     }
   }
+}
+
+// Overwrite the solid minute-ink pixels inside `r` with random LightGray/White
+// "snow" — a no-signal look for the passive (floored) minutes. Works at the
+// framebuffer level so it needs no offscreen bitmap: only fully-opaque white
+// pixels (the glyph interiors, drawn white just above) are touched, so the
+// anti-aliased glyph edges survive as a clean outline around the noise.
+static void prv_staticify(GContext *ctx, GRect r) {
+  GBitmap *fb = graphics_capture_frame_buffer(ctx);
+  if (!fb) return;
+  GRect b = gbitmap_get_bounds(fb);
+  int y1 = r.origin.y + r.size.h;
+  for (int y = r.origin.y; y < y1; y++) {
+    if (y < b.origin.y || y >= b.origin.y + b.size.h) continue;
+    GBitmapDataRowInfo ri = gbitmap_get_data_row_info(fb, y);
+    int x0 = r.origin.x < ri.min_x ? ri.min_x : r.origin.x;
+    int x1 = r.origin.x + r.size.w;
+    if (x1 > ri.max_x + 1) x1 = ri.max_x + 1;
+    for (int x = x0; x < x1; x++) {
+      if (ri.data[x] == GColorWhiteARGB8) {
+        ri.data[x] = (rand() & 1) ? GColorWhiteARGB8 : GColorLightGrayARGB8;
+      }
+    }
+  }
+  graphics_release_frame_buffer(ctx, fb);
 }
 
 #define DATE_BOLD_PX 1   // faux-bold smear for the date row (Michroma has one weight)
@@ -230,11 +279,16 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
 
   // Hour and minute stacked: two digits per row, the pair centred as a unit so a
   // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
-  // so the white minute row overlaps and paints over the foot of the dark-grey
-  // hour row — a deliberate dense stack that buys bigger digits. The whole block
-  // is centred in the space above the date. On the round display the grid is
+  // so the minute row overlaps and paints over the foot of the dark-grey hour
+  // row — a deliberate dense stack that buys bigger digits. The whole block is
+  // centred in the space above the date. On the round display the grid is
   // pulled in from both edges so its corners clear the bezel, and the rows keep
   // a normal positive gap.
+  //
+  // The minute row is drawn solid white, then (when the reading is passive, or
+  // mid lock-on flicker) prv_staticify() turns that white ink into snow. The
+  // hour is always exact, so it stays a solid dark grey and never flickers.
+  bool minutes_snow = !s_exact || s_shimmer_left > 0;
   if (s_sheet) {
     int grid_w = PBL_IF_ROUND_ELSE(132, s_usable_w);
     int grid_x = s_pad + (s_usable_w - grid_w) / 2;
@@ -243,12 +297,14 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
                     (s_date_top - DIGIT_BAND_BOT_GAP - s_digit_band_top - block_h) / 2;
     int dv[4] = { hour / 10, hour % 10, disp_min / 10, disp_min % 10 };
     bool blank_hour_tens = !h24 && hour < 10;
+    GRect min_rect = GRectZero;
 
     graphics_context_set_compositing_mode(ctx, GCompOpSet);
     for (int row = 0; row < 2; row++) {
       int n = (row == 0 && blank_hour_tens) ? 1 : 2;  // digits shown on this row
       int row_x = grid_x + (grid_w - n * s_slot_w) / 2;
       int y = block_top + row * (s_slot_h + DIGIT_GAP);
+      if (row == 1) min_rect = GRect(row_x, y, n * s_slot_w, s_slot_h);
       for (int k = 0; k < n; k++) {
         int idx = row * 2 + (n == 1 ? 1 : k);
         prv_set_ink(s_digit[dv[idx]], row == 0 ? GColorDarkGray : GColorWhite);
@@ -256,6 +312,7 @@ static void prv_canvas_update_proc(Layer *layer, GContext *ctx) {
                                      GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h));
       }
     }
+    if (minutes_snow) prv_staticify(ctx, min_rect);
   } else {
     // Resource-load failure only: fall back to plain text.
     GFont f = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
@@ -426,6 +483,7 @@ static void prv_window_load(Window *window) {
 }
 
 static void prv_window_unload(Window *window) {
+  if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
   layer_destroy(s_canvas_layer);
   for (int i = 0; i < 10; i++) {
     if (s_digit[i]) gbitmap_destroy(s_digit[i]);
@@ -441,6 +499,8 @@ static void prv_init(void) {
     .unload = prv_window_unload,
   });
   window_stack_push(s_window, true);
+
+  srand(time(NULL));  // seeds the minute-snow noise
 
   tick_timer_service_subscribe(MINUTE_UNIT, prv_tick_handler);
   backlight_service_subscribe(prv_backlight_handler);

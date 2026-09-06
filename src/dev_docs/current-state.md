@@ -12,7 +12,9 @@
 - Quiet Time suppresses the tap path; the backlight path stays live but skips a
   repaint that already landed this minute.
 - Freshness signal: month `GColorElectricBlue` when passive, `GColorRed` when
-  exact.
+  exact; **minute digits rendered as TV static when passive**, resolving to
+  solid white on a shake after a ~275 ms lock-on flicker (`prv_staticify` +
+  `s_shimmer_left` / `prv_shimmer_tick`).
 - 12/24h from the system (`clock_is_24h_style`).
 - Repaint skipped whenever it would not change the screen (`s_drawn_hour` /
   `s_drawn_min`).
@@ -27,8 +29,10 @@
 
 ## Not done yet — see `todo.md`
 
-- **Minute-brightness freshness signal.** Design agreed (LightGray passive →
-  White exact) but not implemented — minutes are currently always `GColorWhite`.
+- **Static on gabbro (round).** `prv_staticify` is platform-agnostic (framebuffer
+  capture works on gabbro's 8-bit format) but only tested on emery. Check the
+  snow reads at the smaller 58×62 slot and that the minute-row rect is right on
+  round.
 - **Power-hygiene pass.** The digit block is not on its own layer; the whole
   `s_canvas_layer` (full bounds) is marked dirty every repaint. Formatted
   time/date strings are rebuilt every `prv_canvas_update_proc` call.

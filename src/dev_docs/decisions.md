@@ -37,27 +37,40 @@ effect smaller than the day-to-day variance from notifications and temperature.
 **Trade-off:** We will never have a hard in-house number for the grid's saving.
 Acceptable; the estimate is enough.
 
-## Freshness signalled two ways: month colour + minute brightness
+## Passive minutes render as TV static ("no signal")
 
-**Chose:** Colour is the month's job (blue = passive, red = exact); brightness is
-the minute's job (`GColorLightGray` = passive, `GColorWhite` = exact). The hour
-row is always `GColorDarkGray` and never changes.
+**Chose:** When the reading is passive (floored), the minute digits are filled
+with random `GColorLightGray`/`GColorWhite` "snow" — a dead-channel look — instead
+of solid ink. A shake resolves them: a short lock-on flicker (`SHIMMER_FRAMES`
+redraws of fresh snow, `SHIMMER_MS` apart) then the clean white exact time. The
+hour row is always solid `GColorDarkGray` and never flickers. Month colour is
+unchanged (blue passive / red exact).
 
-**Why:** Two orthogonal signals are easier to learn than one colour meaning two
-things. The month colour alone (the pre-existing signal) is a tiny cue a stranger
-won't decode; dimming the minutes makes "not locked in" legible at a glance
-without adding an element or a glyph. The hour is genuinely always exact, so
-changing it would signal something untrue.
+**Why:** The month colour alone is a tiny corner cue a stranger won't decode.
+An earlier plan (grey minutes → white minutes) was too subtle glancing at the
+face in isolation. Static is unmistakable — "this signal isn't locked in" reads
+instantly, and the shake→lock-on gives the interaction a satisfying payoff. The
+hour is genuinely always exact, so it stays solid.
 
-**Trade-off:** The passive→exact minute change is grey→white, which is subtle
-when glancing at the face in isolation (obvious side by side). Accepted — a
-louder option (blue minutes) was mocked and rejected as making colour do double
-duty. Costs nothing: reuses the existing `prv_set_ink` palette poke, zero power.
+**How:** `prv_staticify()` works at the framebuffer level
+(`graphics_capture_frame_buffer`) — the minute glyphs are drawn solid white,
+then every fully-opaque white pixel inside the minute-row rect is replaced with a
+random grey. The anti-aliased glyph edges (not pure white) are left alone, so the
+digit keeps a clean outline around the noise. ~19k pixel writes per passive
+redraw — negligible at the 5-minute cadence; the lock-on adds `SHIMMER_FRAMES`
+redraws on an explicit shake, also negligible.
 
-**Rejected:** trailing `~`/`+` glyph (needs a sprite, eats horizontal room);
-whole-time-snaps-brighter (lies about the hour); a "very stale" state for Quiet
-Time (risks a `07:00`-at-07:58 face looking frozen — the backlight-forces-exact
-path already covers a real look).
+**Trade-off:** Static is visually *agitated* — arguably against the "calm"
+identity. Accepted deliberately (user asked for it); the snow is frozen between
+5-minute repaints (re-randomised only when the clock ticks the grid or during a
+lock-on), so it doesn't literally flicker at rest. The framebuffer approach ties
+the effect to the 8-bit colour format (fine for emery + gabbro).
+
+**Rejected:** grey-vs-white minute brightness (too subtle); blue minutes (makes
+colour do double duty with the month); trailing `~`/`+` glyph (needs a sprite,
+eats horizontal room); whole-time-snaps-brighter (lies about the hour); a
+stronger "very stale" state for Quiet Time (risks a `07:00`-at-07:58 face looking
+frozen — the backlight-forces-exact path already covers a real look).
 
 ## Deep row overlap for larger digits (`DIGIT_GAP = -20` on emery)
 

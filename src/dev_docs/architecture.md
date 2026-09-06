@@ -68,19 +68,25 @@ can be regenerated ~10% larger in the same vertical budget. The hour row is
 minute ink reads as clearly "in front". Committed in `67ae9f5`. The digit
 foot/head collision this causes is intentional and accepted.
 
-### Colour = one signal, brightness = another
+### Two freshness signals: month colour + minute static
 
-- **Month colour** carries freshness: `GColorElectricBlue` when the reading is
-  passive (floored), `GColorRed` when it was just refreshed to the exact minute.
-- **Minute brightness** carries lockedness: `GColorLightGray` passive →
-  `GColorWhite` exact. *(target design — see `todo.md`; currently minutes are
-  always white.)*
-- **Hour row** is always `GColorDarkGray` and never changes — the hour is always
-  exact, so signalling anything on it would be a lie.
+- **Month colour**: `GColorElectricBlue` when the reading is passive (floored),
+  `GColorRed` when it was just refreshed to the exact minute.
+- **Minute digits**: rendered as TV-static "snow" while passive, resolving to
+  solid `GColorWhite` when exact. A shake plays a short lock-on flicker first
+  (`SHIMMER_FRAMES` × `SHIMMER_MS`, ~275 ms) — fresh snow each frame, then clean.
+- **Hour row**: always solid `GColorDarkGray`, never flickers — the hour is
+  always exact, so signalling anything on it would be a lie.
 
-Recolouring is done by `prv_set_ink()` poking the sprite sheet's palette
-in-place immediately before each blit (sub-bitmaps share the parent palette; no
-second bitmap).
+Hour/minute digits are tinted by `prv_set_ink()` poking the sprite sheet's
+palette in-place before each blit. The static is `prv_staticify()`: after the
+minute glyphs are drawn solid white, it captures the framebuffer
+(`graphics_capture_frame_buffer`, emery/gabbro 8-bit) and replaces every
+fully-opaque white pixel in the minute-row rect with a random
+`GColorLightGray`/`GColorWhite`. Anti-aliased edge pixels (not pure white) are
+left, so the glyph keeps a clean outline. `s_shimmer_left` (an `AppTimer`
+countdown set by `prv_refresh_to_exact`) keeps the minutes in snow for the first
+few frames after a shake, then the frame that lands on zero renders clean.
 
 ## Time model
 

@@ -5,10 +5,14 @@ is the grill session captured in `decisions.md`.
 
 ## Face work
 
-- [ ] **Minute-brightness freshness signal.** In `prv_canvas_update_proc`, tint
-  the minute row `GColorLightGray` when `!s_exact`, `GColorWhite` when `s_exact`.
-  Hour row stays `GColorDarkGray` unconditionally. Reuses `prv_set_ink`. Update
-  the comment near `mon_color` — colour and brightness are now two signals.
+- [x] **Passive-minute freshness signal.** Done — TV static via `prv_staticify`
+  (framebuffer snow), plus a ~275 ms lock-on flicker on shake
+  (`s_shimmer_left` / `prv_shimmer_tick`). See `decisions.md`.
+- [ ] **Tune the shimmer on hardware.** `SHIMMER_FRAMES 5` / `SHIMMER_MS 55` is a
+  guess. Check the lock-on feel on a real wrist — may want longer/shorter, or a
+  brightness ramp rather than pure snow-then-clean.
+- [ ] **Check the static on gabbro** (round, 58×62 slot) — code is
+  platform-agnostic but untested there.
 - [ ] **Validate the overlap + dark-grey hour on hardware.** `67ae9f5` is
   unvalidated. Check dark-grey-on-black legibility unlit and the digit
   foot/head collision on `22:57` / `12:38` / `08:07`. If the hour is too dim,
