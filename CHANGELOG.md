@@ -5,8 +5,9 @@
 - Shake-log CSV and phone settings-page log now list newest day/hour first
   instead of oldest.
 - Date row is now a hardcoded solid white instead of a mid-blue tint, and
-  the font is Orbitron Bold instead of Michroma — a real bold weight instead
-  of a faux-bold pixel smear (Michroma has no bold cut at all).
+  the font is Quantico Bold instead of Michroma — a real bold weight instead
+  of a faux-bold pixel smear (Michroma has no bold cut at all). Tried Orbitron
+  Bold first, but its zero has a diagonal slash through it; Quantico doesn't.
 - Minute row is now offset 15px left of the hour row for a slight stagger.
 - Passive-minute static is dialed back (was a full 1000/1000 permille snowed,
   now 350/1000) so it reads as less agitated.

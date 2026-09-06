@@ -54,21 +54,21 @@
         {
           "type": "font",
           "name": "FONT_DATE_14",
-          "file": "fonts/Orbitron-Bold.ttf",
+          "file": "fonts/Quantico-Bold.ttf",
           "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["gabbro"]
         },
         {
           "type": "font",
           "name": "FONT_DATE_18",
-          "file": "fonts/Orbitron-Bold.ttf",
+          "file": "fonts/Quantico-Bold.ttf",
           "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["emery"]
         },
         {
           "type": "font",
           "name": "FONT_DATE_21",
-          "file": "fonts/Orbitron-Bold.ttf",
+          "file": "fonts/Quantico-Bold.ttf",
           "characterRegex": "[A-Z0-9 .À-Öß]",
           "targetPlatforms": ["emery"]
         }

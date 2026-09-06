@@ -55,9 +55,9 @@
 - **Locale — mostly wired (Latin-script scope).** `prv_init` calls
   `setlocale(LC_ALL, i18n_get_system_locale())`; `strftime %a/%b` then follow the
   installed language pack (English if none). `prv_utf8_upper` uppercases ASCII +
-  the Latin-1 accented block. Date font is `Orbitron-Bold.ttf` subset to
-  `[A-Z0-9 .À-Öß]` (Orbitron doesn't cut Ð/Ø/Þ, unneeded by these locales
-  anyway). Emery date font is picked at window load
+  the Latin-1 accented block. Date font is `Quantico-Bold.ttf` subset to
+  `[A-Z0-9 .À-Öß]` (Quantico's cmap has no gaps in that range). Emery date
+  font is picked at window load
   (`prv_pick_date_font`): 21px normally, 18px only if the locale's widest
   weekday+month abbreviations wouldn't fit at 21 (FR/ES, with "SEPT." + accented
   period-weekdays). Untested on real hardware with a non-English language pack.
@@ -113,7 +113,7 @@
 | `package.json` | Pebble metadata, message keys, resources |
 | `wscript` | SDK build rules (unmodified) |
 | `resources/fonts/AlfaSlabOne-Regular.ttf` | Source for the digit sprite sheets |
-| `resources/fonts/Orbitron-Bold.ttf` | Date row font (`FONT_DATE_14` on gabbro; `FONT_DATE_21` or `_18` on emery, picked at load) |
+| `resources/fonts/Quantico-Bold.ttf` | Date row font (`FONT_DATE_14` on gabbro; `FONT_DATE_21` or `_18` on emery, picked at load) |
 | `resources/images/digits.png` | gabbro sprite sheet — slot 73×80 |
 | `resources/images/digits_lg.png` | emery sprite sheet — slot 93×103 |
 | `resources/images/icon.png` | Launcher icon, 25×25, white glyph + black keyline |

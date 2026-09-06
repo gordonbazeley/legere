@@ -157,9 +157,9 @@ users see a tofu box or English". Non-Latin scripts would blow the font cost and
 likely break the layout for a date line.
 
 **State:** implemented, pending a hardware pass. `setlocale` wired in `prv_init`;
-`prv_utf8_upper` does non-ASCII uppercasing; date font is `Orbitron-Bold.ttf`
-subset to `[A-Z0-9 .À-Öß]` (Orbitron doesn't cut Ð/Ø/Þ, unneeded by these
-locales anyway). Emery picks 21px or 18px at load
+`prv_utf8_upper` does non-ASCII uppercasing; date font is `Quantico-Bold.ttf`
+subset to `[A-Z0-9 .À-Öß]` (Quantico's cmap has no gaps in that range).
+Emery picks 21px or 18px at load
 (`prv_pick_date_font`) by measuring the locale's widest weekday/month strings —
 FR/ES overrun 21px ("SEPT." + accented period-weekdays), the rest keep 21.
 Untested with a real non-English language pack — the emulator can't install one.

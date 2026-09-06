@@ -23,9 +23,10 @@ static bool s_exact = false;
 // next scheduled tick either way.
 static int s_passive_min = 0;
 
-// Date line: Orbitron Bold. Glyph subset in package.json covers A-Z, digits,
+// Date line: Quantico Bold. Glyph subset in package.json covers A-Z, digits,
 // space, '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL —
-// Orbitron doesn't cut Ð/Ø/Þ, but none of those locales need them.
+// Quantico's cmap has no gaps in that set (checked against the full Latin-1
+// accented block, not just what these locales use).
 static GFont s_date_font;
 static bool s_date_font_custom;
 
