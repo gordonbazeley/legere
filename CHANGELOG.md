@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+_Nothing yet._
+
+## 2026-09-06
+
 - Quiet Time no longer falls back to an hourly repaint grid — the face
   redraws on the same 5-minute grid whether Quiet Time is on or not.
   Shake-to-wake stays blocked during Quiet Time as before.

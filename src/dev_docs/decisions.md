@@ -65,12 +65,12 @@ Acceptable; the estimate is enough.
 with random `SNOW[]` "snow" (white → black) — a dead-channel look — instead of
 solid ink. A shake resolves them with a lock-on ramp: `SHIMMER_FRAMES` redraws
 `SHIMMER_MS` apart, each snowing a smaller fraction of the ink
-(`prv_snow_permille()` 1000→0), so the digits surface out of the noise; the last
-frame is clean white. The ramp is symmetric — when the exact reading expires it
-plays in reverse (`s_shimmer_out`, 0→1000) so the minute dissolves back into
-static instead of a one-frame cut. The hour row is always solid `GColorDarkGray`
-and never flickers. The date row does **not** carry a freshness cue — whole line is a
-constant mid blue (`DATE_COLOR` = `GColorVividCerulean`).
+(`prv_snow_permille()` `PASSIVE_SNOW_PERMILLE`→0), so the digits surface out of
+the noise; the last frame is clean white. The ramp is symmetric — when the
+exact reading expires it plays in reverse (`s_shimmer_out`) so the minute
+dissolves back into static instead of a one-frame cut. The hour row is always
+solid `GColorDarkGray` and never flickers. The date row does **not** carry a
+freshness cue — whole line is a constant `GColorWhite` (`DATE_COLOR`).
 
 **Why:** An early version put the freshness cue on the month colour (blue
 passive / red exact). Dropped: it's a tiny corner cue a stranger won't decode,
@@ -79,7 +79,10 @@ reads instantly, and the shake→lock-on gives the interaction a satisfying
 payoff. An earlier plan (grey minutes → white minutes) was too subtle glancing
 at the face in isolation. The hour is genuinely always exact, so it stays solid.
 Colouring the whole date row (not just white text) also just reads better on
-the unlit transflective LCD, where the old white day-of-month was faint.
+the unlit transflective LCD, where the old white day-of-month was faint. The
+whole-row tint itself later went from a mid blue (`GColorVividCerulean`) to
+plain white — simplest thing that reads, no real reason to keep a second
+accent colour once it wasn't doing any signalling work.
 
 **How:** `prv_staticify(ctx, rect, permille)` works at the framebuffer level
 (`graphics_capture_frame_buffer`) — the minute glyphs are drawn solid white,
@@ -88,10 +91,12 @@ probability `permille`/1000, replaced by a random `SNOW[]` entry (white → ligh
 grey → dark grey → black — a real dropout spread, not just greys, so it carries
 on the unlit reflective LCD). The anti-aliased glyph edges (not pure white) are
 left alone, so the digit keeps a clean outline around the noise. `permille` is
-1000 while passive; the lock-on ramp (`prv_snow_permille()`, `SHIMMER_FRAMES`
-redraws) steps it 1000→0 so the digits emerge from the noise. ~19k pixel writes
-per passive redraw — negligible at the 5-minute cadence; the ramp is a one-shot
-burst on an explicit shake.
+`PASSIVE_SNOW_PERMILLE` while passive (currently 350 — dialed back from a full
+1000 across a few rounds of tuning, since 1000 read as more agitated than
+intended); the lock-on ramp (`prv_snow_permille()`, `SHIMMER_FRAMES` redraws)
+steps it `PASSIVE_SNOW_PERMILLE`→0 so the digits emerge from the noise. ~19k
+pixel writes per passive redraw — negligible at the 5-minute cadence; the ramp
+is a one-shot burst on an explicit shake.
 
 **Trade-off:** Static is visually *agitated* — arguably against the "calm"
 identity. Accepted deliberately (user asked for it); the snow is frozen between
@@ -115,6 +120,32 @@ colour do double duty with the month); trailing `~`/`+` glyph (needs a sprite,
 eats horizontal room); whole-time-snaps-brighter (lies about the hour); a
 stronger "very stale" state for Quiet Time (risks a `07:00`-at-07:58 face looking
 frozen — the backlight-forces-exact path already covers a real look).
+
+## An expiring exact reading holds the real minute, doesn't floor backward
+
+**Chose:** `s_passive_min` is tracked as state rather than recomputed as
+`prv_floor5(current real minute)` on every passive redraw. `prv_tick_handler`
+keeps it grid-aligned during normal operation (writing `tick_time->tm_min` at
+ticks where that's already a 5-minute mark — the same result as the old
+floor), but the moment an exact reading expires it's pinned to that real,
+unfloored minute instead, only re-syncing to the grid at the next scheduled
+tick.
+
+**Why:** The old `prv_floor5(t->tm_min)`-every-redraw approach meant the
+instant a shaken-exact reading expired, the passive display floored to the
+5-minute mark *before* the exact minute — e.g. a shake at 12:33 (exact "12:33")
+expiring one tick later at 12:34 showed static "12:30", since `floor5(34) ==
+30`. That reads as the clock rewinding, which undermines the whole "static =
+imprecise, not wrong" premise the freshness signal depends on (see "Passive
+minutes render as TV static" above). Holding "12:34" instead — the truthful
+minute the reveal just expired at — never contradicts a minute the user
+already saw exact.
+
+**Trade-off:** The passive minute can very briefly (until the next 5-minute
+mark) show a value that isn't itself a multiple of 5, which is a small
+departure from "minutes are always shown soft" as a strict invariant. Accepted
+— it only happens right after a shake, already snowed over, and the
+alternative (the backward jump) was the actually-confusing behaviour.
 
 ## Deep row overlap for larger digits (`DIGIT_GAP = -20` on emery)
 
@@ -153,6 +184,33 @@ row and visible only when selected. The keyline makes it read on any background.
 
 **Trade-off:** 1px of the glyph body is eaten by the outline; the feather detail
 is a touch heavier at 25×25. Fine.
+
+## Date font: Michroma → Orbitron Bold → Quantico Bold
+
+**Chose:** `Quantico-Bold.ttf` at 16px (gabbro) / 24px, dropping to 20px where
+the locale is too wide (emery) — see "Locale support" below for the glyph
+subset. Went through two prior fonts to get here.
+
+**Why it changed twice:** Michroma (the original date font) has no bold cut at
+all — it ships one weight — so the row needed a faux-bold trick: `prv_draw_cell`
+redrew the glyph at a 1-2px offset in both axes to fake a heavier stroke. That
+smear approach has real limits (an x-only smear thickens vertical strokes but
+not horizontal ones; a full 2px smear in both axes blurs letters together;
+fractional weights like "1.5px" can only be faked with a lighter-shade fringe
+pixel, not a true half-pixel offset) that a font with a genuine bold weight
+sidesteps entirely. Orbitron Bold was the first real-bold candidate tried —
+same geometric/futuristic character as Michroma, OFL-licensed, ships weights
+400-900 — but its zero has a diagonal slash through it in every weight
+(checked Regular and Bold), which reads oddly in the day-of-month digits.
+Quantico Bold has a real bold weight, no slashed zero, and a cmap with no gaps
+against the full Latin-1 accented block (a superset of what
+FR/DE/ES/IT/PT/NL need) — so no `characterRegex` changes were needed beyond
+what Orbitron had already required (dropping Ð/Ø/Þ, which Orbitron's cmap
+lacked and which none of the supported locales use anyway).
+
+**Trade-off:** `prv_draw_cell` is back to a single `graphics_draw_text` call —
+simpler than it was, no smear/fringe code to carry. Quantico is a slightly
+plainer geometric face than Orbitron; accepted for the correct zero glyph.
 
 ## Config from system preferences only — no custom settings UI
 

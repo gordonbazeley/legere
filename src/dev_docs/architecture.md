@@ -3,9 +3,10 @@
 ## What it is
 
 A calm, deliberate Pebble watchface. Bold overlapping slab numerals for the
-time; the **minutes are shown soft** (floored to a multiple of 5) unless the
-user asks for the exact minute with a wrist shake. A date row underneath
-carries a freshness colour signal.
+time; the **minutes are shown soft** (rendered as TV static, floored to a
+multiple of 5) unless the user asks for the exact minute with a wrist shake.
+A date row underneath is a plain white constant — the minute static is the
+face's only freshness signal (see "One freshness signal" below).
 
 It is **not** a "lowest-power" face as its headline (that was an early framing —
 see `decisions.md` → "The 5-minute grid is an identity choice, not a power
@@ -18,7 +19,8 @@ Single-file watch app. The phone companion is just a static settings page
 ```
 tick (every minute, from the OS)
   ├── advance the day-record ring, sample Quiet Time flag
-  ├── if a forced-exact reading's minute has ticked over: clear s_exact, repaint
+  ├── if a forced-exact reading's minute has ticked over: pin s_passive_min to
+  │   the real minute, start the reverse ramp (clears s_exact on its last frame)
   ├── on the 5-minute grid (Quiet Time or not): mark dirty, passive repaint
   │
 shake / tap  ──┐
@@ -54,11 +56,12 @@ grid in from both edges so its corners clear the bezel.
 
 | constant | emery | gabbro | meaning |
 |---|---|---|---|
-| `PAD` | 6 | 18 | screen-edge padding |
-| `DIGIT_GAP` | **−20** | 4 | px between hour and minute rows; negative = deliberate overlap |
-| `DIGIT_BAND_BOT_GAP` | 5 | 4 | px between minute row and date row |
-| `top_margin` | 5 | 16 | |
-| `bot_margin` | 2 | 22 | |
+| `PAD` | 6 | 20 | screen-edge padding |
+| `DIGIT_GAP` | **−20** | 6 | px between hour and minute rows; negative = deliberate overlap |
+| `DIGIT_BAND_BOT_GAP` | 5 | 6 | px between minute row and date row |
+| `top_margin` | 5 | 28 | |
+| `bot_margin` | n/a | 32 | gabbro only — emery derives `s_date_top` without it |
+| `MINUTE_ROW_SHIFT_X` | 15 | 15 | px the minute row is pulled left of the hour row's centred position (both platforms) |
 
 On emery `s_date_top` is derived from the same terms as the block-centering
 expression, so `block_top` collapses to `top_margin` and any vertical slack
@@ -209,16 +212,19 @@ ever writes a row for an hour that hasn't happened yet:
   finishes** (the first tick of the next hour, `prv_tick_handler`). The
   in-progress hour is never logged; earlier hours today land in the log only if
   `pebble logs` was capturing across each hour boundary.
-  `pebble logs | tee watch.log` then `tools/pebble-log-to-csv.py`.
+  `pebble logs | tee watch.log` then `tools/pebble-log-to-csv.py`, which
+  buffers the matched rows and prints them newest-first (the log capture
+  itself is oldest-first).
 - **AppMessage** → `src/pkjs/index.js` → the settings page's "Diagnostic log"
   section (CSV + Web Share / textarea). `prv_inbox_received_handler` catches
   `RequestLog` and `prv_export_send_next` streams every non-empty persist slot,
   **including today's partial record** (created + persisted by the first tick
   after midnight), paced by `prv_outbox_sent_handler`, then `Done`. `openPage()`
-  in `index.js` then skips any hour whose `battery` sample is still `255` (the
-  init value — meaning that hour hasn't happened yet on the in-progress day)
-  before building the CSV, so the exported log never has placeholder rows for
-  the rest of today.
+  in `index.js` sorts days newest-first and each day's hours 23→0, skips any
+  hour whose `battery` sample is still `255` (the init value — meaning that
+  hour hasn't happened yet on the in-progress day) before building the CSV, so
+  the exported log lists newest first and never has placeholder rows for the
+  rest of today.
 
 Note both paths read persist storage, which `pebble install` **wipes** — after a
 reinstall there is no history, only what has accrued since.

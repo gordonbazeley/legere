@@ -9,8 +9,10 @@ is the grill session captured in `decisions.md`.
   (framebuffer snow), plus a lock-on ramp on shake
   (`s_shimmer_left` / `prv_shimmer_tick`). See `decisions.md`.
 - [x] **Lock-on ramp instead of snow-then-clean.** Done — `prv_snow_permille()`
-  steps the snowed fraction of the minute ink 1000→0 over `SHIMMER_FRAMES`, so
-  the digits surface out of the noise. `prv_staticify` gained a `permille` arg.
+  steps the snowed fraction of the minute ink `PASSIVE_SNOW_PERMILLE`→0 (that
+  ceiling has since been tuned down from a full 1000 to 350 — see
+  `decisions.md`) over `SHIMMER_FRAMES`, so the digits surface out of the
+  noise. `prv_staticify` gained a `permille` arg.
 - [x] **Symmetric ramp on loss of lock.** Done — `s_shimmer_out` runs the same
   ramp in reverse (0→1000) when the clock ticks past the locked minute;
   `prv_shimmer_tick` clears `s_exact` on the last frame. Was a one-frame hard cut.
@@ -62,19 +64,25 @@ is the grill session captured in `decisions.md`.
 ## Locale (Latin-script scope — see `decisions.md`)
 
 - [x] `setlocale(LC_ALL, i18n_get_system_locale())` in `prv_init`. Done.
-- [x] Expand the `FONT_DATE_*` `characterRegex`. Done — now
-  `[A-Z0-9 .À-ÖØ-Þß]`. Also swapped the font file from `MichromaText.ttf` (a
-  hand-subset copy with only `[A-Z0-9 ]` — no accents, no `.`) to the full
-  `Michroma-Regular.ttf`; `characterRegex` does the subsetting at build.
+- [x] Expand the `FONT_DATE_*` `characterRegex`. Done — swapped the font file
+  from `MichromaText.ttf` (a hand-subset copy with only `[A-Z0-9 ]` — no
+  accents, no `.`) to the full `Michroma-Regular.ttf`, with `characterRegex`
+  doing the subsetting at build. The date font itself later changed twice more
+  (Orbitron Bold, then Quantico Bold — see `decisions.md`), each time keeping
+  a regex covering the same accented-capitals need; current value is
+  `[A-Z0-9 .À-Öß]`.
 - [x] Replace the ASCII `toupper` loops. Done — `prv_utf8_upper` handles ASCII +
   the whole Latin-1 accented lowercase block (0xC3 0xA0..0xBE). ß has no
   single-char uppercase, left as-is.
 - [x] Check the date row fits. Done — the widest realistic row is French
   "SEPT. 06 AOÛT" ("sept." abbreviation + accented weekday), which collides at
-  21px. Rather than hardcode a locale list, `prv_pick_date_font` measures every
-  weekday + month abbreviation the active locale produces at load and uses 21px
-  if they fit, else 18px. EN/DE/IT/PT/NL keep 21; FR (and probably ES) get 18.
-  Verified in the emulator: EN picks 21, forced-wide strings pick 18 and clear.
+  the font's large size. Rather than hardcode a locale list, `prv_pick_date_font`
+  measures every weekday + month abbreviation the active locale produces at
+  load and uses the large size if they fit, else the small one. Sizes have
+  since moved with the font/size tuning (was 21/18px, now 24/20px — see
+  `decisions.md`); the fit-or-fall-back logic is unchanged. Verified in the
+  emulator: EN picks the large size, forced-wide strings pick the small one
+  and clear.
 - [ ] **Validate locale on hardware.** Emulator can't install a language pack,
   so the real localised strings are still untested. Install FR (worst case) + DE
   packs on emery, confirm the row fits unlit and the accented caps render.

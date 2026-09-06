@@ -8,11 +8,19 @@
   `GColorDarkGray`.
 - Gabbro: digits 73×80, rows a positive 6px apart, centred; hour row
   `GColorDarkGray`.
+- Minute row is offset `MINUTE_ROW_SHIFT_X` (15px) left of the hour row's
+  centred position, on both platforms — a slight horizontal stagger.
 - Passive 5-minute repaint grid, Quiet Time or not (no hourly fallback).
 - Wrist shake / tap (daylight) and backlight-on (dark) force an exact-minute
   repaint; `prv_refresh_to_exact` no-ops if the exact time is already shown.
 - Quiet Time suppresses the tap path; the backlight path stays live but skips a
   repaint that already landed this minute.
+- `s_passive_min` holds the passive minute as state rather than recomputing a
+  floor from live time on every redraw — kept grid-aligned during normal
+  operation, but pinned to the real minute an expiring exact reading just
+  showed until the next scheduled tick, so the display never jumps backward
+  to the grid mark *before* that minute (exact "12:33" expiring no longer
+  shows static "12:30" — it holds "12:34" until the next 5-minute mark).
 - Freshness signal is **the minute static alone**: minute digits rendered as TV
   static when passive, resolving to solid white on a shake via a ~320 ms lock-on
   ramp — `prv_snow_permille()` steps the snowed fraction of the minute ink
@@ -33,15 +41,18 @@
   `battery[24]` is last in the struct so pre-battery 32-byte blobs still read
   back cleanly. CSV gains a `battery` column (integer percent).
 - Log export, two paths (both temporary, out at store launch), both hour-by-
-  hour — neither ever writes a row for an hour that hasn't happened yet:
+  hour, both newest-first — neither ever writes a row for an hour that hasn't
+  happened yet:
   - **`APP_LOG` rows** in the exact CSV shape, one per *finished* hour —
-    `pebble logs` capture + `tools/pebble-log-to-csv.py`. The in-progress hour
-    is never logged; earlier hours only appear if capture was running at each
-    hour boundary.
+    `pebble logs` capture + `tools/pebble-log-to-csv.py` (buffers the matched
+    rows and prints newest-first; the raw log capture is oldest-first). The
+    in-progress hour is never logged; earlier hours only appear if capture was
+    running at each hour boundary.
   - **AppMessage** → `src/pkjs/index.js` → the settings page's "Diagnostic
     log" section (CSV + Web Share / textarea). Sends every persisted
-    `DayRecord` slot including today's partial one, but `openPage()` skips
-    any hour whose `battery` sample is still `255` before building the CSV —
+    `DayRecord` slot including today's partial one, sorted newest-day-first
+    with each day's hours 23→0, and `openPage()` skips any hour whose
+    `battery` sample is still `255` before building the CSV —
     so today's still-to-come hours never show up as placeholder rows.
 - Companion settings page (`src/pkjs/settings.html`, generated string in
   `settings-html.js`): a temporary diagnostic-log section (above), then info +
@@ -100,6 +111,13 @@
   vertical/width budget in `architecture.md` after any change.
 - Emulator: `pebble install --emulator emery` (or `gabbro`). `pebble emu-set-time`
   did not reliably stick in testing — the emulator tends to track host time.
+- CI (`.github/workflows/build-pbw.yml`): every push to `main` installs
+  pebble-tool + the SDK (`pebble sdk install latest`, cached on
+  `~/.pebble-sdk`) and runs `pebble build`. Uploads the `.pbw` as a normal
+  Actions artifact, and — since that artifact storage isn't reachable from
+  every environment that might want the build — also force-pushes it as the
+  sole file on an orphan `pbw-latest` branch, fetchable with nothing but
+  `git fetch origin pbw-latest && git show origin/pbw-latest:legere.pbw > legere.pbw`.
 - Some `pebble` commands need the sandbox disabled in this environment (they
   write into the repo tree).
 
@@ -107,7 +125,9 @@
 
 | File | Role |
 |---|---|
-| `src/c/legere.c` | Entire watch app (~490 lines) |
+| `src/c/legere.c` | Entire watch app (~700 lines) |
+| `CHANGELOG.md` | User-facing changelog — `## Unreleased` plus dated sections |
+| `.github/workflows/build-pbw.yml` | CI: builds the `.pbw` on every push to `main`, publishes it to Actions artifacts and the `pbw-latest` branch |
 | `src/pkjs/index.js` | Phone companion: pulls the log over AppMessage (temporary) + opens the settings page on `showConfiguration` |
 | `src/pkjs/settings.html` | Companion settings page — temporary diagnostic-log section, then info + GitHub issues + ko-fi link (editable source) |
 | `src/pkjs/settings-html.js` | Generated CommonJS string of `settings.html`, loaded by pkjs — regen after editing the HTML |
