@@ -4,8 +4,9 @@
 // is awkward to iterate on. This just serves the file over http://127.0.0.1
 // and opens it in the default browser.
 //
-//   node src/open_config.js           # ko-fi page only
-//   node src/open_config.js --log     # also fill the temporary diagnostic-log section with sample rows
+//   node src/open_config.js               # ko-fi page only
+//   node src/open_config.js --log         # also fill the temporary diagnostic-log section with sample rows
+//   node src/open_config.js --redraw=1    # preview the Time refresh radio pre-selected to "every minute"
 
 var http = require('http');
 var fs = require('fs');
@@ -18,7 +19,9 @@ if (!fs.existsSync(SETTINGS_HTML)) {
   process.exit(1);
 }
 
-var withLog = process.argv.indexOf('--log') !== -1;
+var redrawArg = process.argv.filter(function (a) { return a.indexOf('--redraw=') === 0; })[0];
+var redrawMode = redrawArg ? Number(redrawArg.split('=')[1]) : 0;
+var withLog = process.argv.indexOf('--log') !== -1 || !!redrawArg;
 
 function sampleLog() {
   var rows = ['date,hour,quiet_hour,shakes,battery'];
@@ -27,7 +30,7 @@ function sampleLog() {
     rows.push('05/09/2026,' + (h < 10 ? '0' : '') + h + ',' + quiet + ',' + (h % 4) +
               ',' + (100 - 3 * h));
   }
-  return 'var LOG={days:1,csv:' + JSON.stringify(rows.join('\n')) + '};';
+  return 'var LOG={days:1,redrawMode:' + redrawMode + ',csv:' + JSON.stringify(rows.join('\n')) + '};';
 }
 
 var server = http.createServer(function(req, res) {

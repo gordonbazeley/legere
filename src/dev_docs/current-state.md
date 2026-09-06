@@ -10,7 +10,11 @@
   `GColorDarkGray`.
 - Minute row is offset `MINUTE_ROW_SHIFT_X` (15px) left of the hour row's
   centred position, on both platforms — a slight horizontal stagger.
-- Passive 5-minute repaint grid, Quiet Time or not (no hourly fallback).
+- Passive 5-minute repaint grid, Quiet Time or not (no hourly fallback) — or
+  a plain every-minute mode with no static/shake at all, if the user has
+  picked that in the "Time refresh" setting (`s_every_minute`,
+  `MESSAGE_KEY_RedrawMode`, persisted). Stopgap until touch is enabled for
+  watchapps; see `decisions.md`.
 - Wrist shake / tap (daylight) and backlight-on (dark) force an exact-minute
   repaint; `prv_refresh_to_exact` no-ops if the exact time is already shown.
 - Quiet Time suppresses the tap path; the backlight path stays live but skips a
@@ -55,9 +59,12 @@
     `battery` sample is still `255` before building the CSV —
     so today's still-to-come hours never show up as placeholder rows.
 - Companion settings page (`src/pkjs/settings.html`, generated string in
-  `settings-html.js`): a temporary diagnostic-log section (above), then info +
-  GitHub issues + ko-fi link. No configurable settings. Preview with
-  `node src/open_config.js` (`--log` for sample rows).
+  `settings-html.js`): "Time refresh" (the setting above — pre-selects from
+  the watch's current value, Save closes the page via the standard
+  `pebblejs://close#<json>` handoff, `index.js`'s `webviewclosed` listener
+  relays it back as `RedrawMode`), then a temporary diagnostic-log section,
+  then info + GitHub issues + ko-fi link. Preview with `node src/open_config.js`
+  (`--log` for sample rows, `--redraw=1` to preview the radio pre-selected).
 - Launcher icon (`resources/images/icon.png`) reads on any launcher background
   (white glyph + black keyline).
 - Builds via `pebble build`; `tools/strip-js-sourcemap.sh` drops the unused
@@ -89,10 +96,13 @@
   overpainted by the minute digit's head (e.g. `22:57`). Intentional; grey/white
   contrast carries it, but it's the main thing to sanity-check on hardware.
 - **`configurable` capability stays** — it backs the settings/ko-fi page. The
-  AppMessage export (message keys, `prv_outbox_*` / `prv_inbox_received`) is
-  still wired to the settings page's diagnostic-log section — that all comes
-  out together at store launch, leaving `index.js` as just the
-  `showConfiguration` → settings-page opener.
+  diagnostic-log AppMessage export (`Year`/`Mon`/`Mday`/`Shakes`/`Battery`/
+  `QuietMask`/`RequestLog`/`Done` message keys, `prv_outbox_*` /
+  `prv_inbox_received`) comes out at store launch, leaving `index.js` with
+  just the `showConfiguration` opener and the `RedrawMode` setting relay.
+  `RedrawMode` is a *separate*, not-temporary message key — it stays until
+  touch is enabled for watchapps (see `decisions.md`), independent of the
+  diagnostic-instrumentation removal.
 - **`prv_measure` uses a fixed 400×300 layout box.** Fine for the short strings
   used, but it is a text-layout call — keep it out of any redraw path (currently
   only `prv_window_load` calls it).
@@ -129,7 +139,7 @@
 | `CHANGELOG.md` | User-facing changelog — `## Unreleased` plus dated sections |
 | `.github/workflows/build-pbw.yml` | CI: builds the `.pbw` on every push to `main`, publishes it to Actions artifacts and the `pbw-latest` branch |
 | `src/pkjs/index.js` | Phone companion: pulls the log over AppMessage (temporary) + opens the settings page on `showConfiguration` |
-| `src/pkjs/settings.html` | Companion settings page — temporary diagnostic-log section, then info + GitHub issues + ko-fi link (editable source) |
+| `src/pkjs/settings.html` | Companion settings page — Time refresh setting, then a temporary diagnostic-log section, then info + GitHub issues + ko-fi link (editable source) |
 | `src/pkjs/settings-html.js` | Generated CommonJS string of `settings.html`, loaded by pkjs — regen after editing the HTML |
 | `src/open_config.js` | Dev helper: serves `settings.html` on localhost for browser preview (`--log` injects sample rows) |
 | `package.json` | Pebble metadata, message keys, resources |

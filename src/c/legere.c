@@ -23,6 +23,16 @@ static bool s_exact = false;
 // next scheduled tick either way.
 static int s_passive_min = 0;
 
+// User setting (phone settings page, MESSAGE_KEY_RedrawMode, persisted at
+// PERSIST_KEY_REDRAW_MODE): false = current behaviour (5-minute soft grid,
+// shake/tap/backlight to reveal exact). true = every-minute mode - the
+// static/shake mechanic is bypassed entirely and the minute is always shown
+// exact, redrawn every minute. Stopgap for platforms without a shake gesture
+// worth the friction; the plan is to remove this once touch is enabled for
+// watchapps (see decisions.md) and drop back to a single behaviour.
+static bool s_every_minute = false;
+#define PERSIST_KEY_REDRAW_MODE 195
+
 // Date line: Quantico Bold. Glyph subset in package.json covers A-Z, digits,
 // space, '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL —
 // Quantico's cmap has no gaps in that set (checked against the full Latin-1
@@ -70,7 +80,9 @@ static AppTimer *s_shimmer_timer = NULL;
 // Snow density for the current frame, in permille of the minute-ink pixels:
 // PASSIVE_SNOW_PERMILLE = passive / no signal, 0 = clean. A ramp in flight wins
 // over s_exact: lock-on steps PASSIVE_SNOW_PERMILLE->0, lock-out steps the reverse.
+// Every-minute mode never snows at all - the minute is always exact there.
 static int prv_snow_permille(void) {
+  if (s_every_minute) return 0;
   if (s_shimmer_left > 0) {
     int snowed = s_shimmer_out ? SHIMMER_FRAMES - s_shimmer_left : s_shimmer_left;
     return snowed * PASSIVE_SNOW_PERMILLE / SHIMMER_FRAMES;
@@ -177,6 +189,9 @@ static void prv_export_finish(void) {
   s_export_slot = -1;
   DictionaryIterator *iter;
   if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
+    // Rides along with Done so the settings page can pre-select the right
+    // radio for the current redraw mode when it opens.
+    dict_write_int32(iter, MESSAGE_KEY_RedrawMode, s_every_minute ? 1 : 0);
     dict_write_int32(iter, MESSAGE_KEY_Done, 1);
     dict_write_end(iter);
     app_message_outbox_send();
@@ -222,6 +237,21 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
   if (dict_find(iterator, MESSAGE_KEY_RequestLog)) {
     s_export_slot = -1;
     prv_export_send_next();
+  }
+  Tuple *redraw_tuple = dict_find(iterator, MESSAGE_KEY_RedrawMode);
+  if (redraw_tuple) {
+    bool new_every_minute = redraw_tuple->value->int32 != 0;
+    if (new_every_minute != s_every_minute) {
+      s_every_minute = new_every_minute;
+      persist_write_bool(PERSIST_KEY_REDRAW_MODE, s_every_minute);
+      // Re-sync so the change is visible immediately rather than waiting for
+      // the next scheduled tick - falling back to 5-minute mode re-floors to
+      // the grid, matching what the next real tick would have set anyway.
+      time_t now = time(NULL);
+      struct tm *t = localtime(&now);
+      if (!s_every_minute) s_passive_min = prv_floor5(t->tm_min);
+      layer_mark_dirty(s_digits_layer);
+    }
   }
 }
 
@@ -397,7 +427,7 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
 
   bool h24 = clock_is_24h_style();
   int hour = prv_display_hour(t);
-  int disp_min = s_exact ? t->tm_min : s_passive_min;
+  int disp_min = (s_exact || s_every_minute) ? t->tm_min : s_passive_min;
 
   // Hour and minute stacked: two digits per row, the pair centred as a unit so a
   // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
@@ -548,7 +578,9 @@ static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // to fall back to hourly while the user's Quiet Time is on (asleep or in a
   // meeting). Shake-to-wake stays blocked during Quiet Time regardless, since
   // that's the OS's own backlight behaviour, untouched by this handler.
-  if (tick_time->tm_min % 5 == 0) {
+  // s_every_minute drops the grid to every tick instead of every 5th.
+  int step = s_every_minute ? 1 : 5;
+  if (tick_time->tm_min % step == 0) {
     s_exact = false;
     s_passive_min = tick_time->tm_min;  // already grid-aligned here - resync point
     s_sched_hour = tick_time->tm_hour;
@@ -597,6 +629,8 @@ static void prv_window_load(Window *window) {
 
   time_t now = time(NULL);
   s_passive_min = prv_floor5(localtime(&now)->tm_min);  // first render, before any tick fires
+  s_every_minute = persist_exists(PERSIST_KEY_REDRAW_MODE) &&
+                   persist_read_bool(PERSIST_KEY_REDRAW_MODE);
 
   s_pad = PAD;
   s_usable_w = bounds.size.w - 2 * s_pad;

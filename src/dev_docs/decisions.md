@@ -215,15 +215,51 @@ plainer geometric face than Orbitron; accepted for the correct zero glyph.
 ## Config from system preferences only — no custom settings UI
 
 **Chose:** 12/24h from `clock_is_24h_style()`, locale from the system (once
-wired — see `todo.md`). No user-facing config for colours, fields shown, or the
-exact/passive default.
+wired — see `todo.md`). No user-facing config for colours or fields shown.
 
 **Why:** The user already set these in Pebble settings; a settings page just to
 duplicate them is friction. Keeps the phone companion to the log export + a
 ko-fi link.
 
-**Trade-off:** Someone who wants, e.g., always-exact or a different accent colour
-can't have it. Acceptable for v1.
+**Trade-off:** Someone who wants, e.g., a different accent colour can't have
+it. Acceptable for v1.
+
+**Superseded in part** by "Time refresh setting: 5-minute-plus-shake vs.
+every-minute" below — the exact/passive default is now user-configurable
+after all, but only as an explicit stopgap for the touch-less state of
+things, not a reversal of the general "no config UI" stance.
+
+## Time refresh setting: 5-minute-plus-shake vs. every-minute
+
+**Chose:** A real setting on the phone settings page — `MESSAGE_KEY_RedrawMode`
+(int, persisted at `PERSIST_KEY_REDRAW_MODE` via `persist_write_bool` /
+`s_every_minute`) — toggling between the existing 5-minute-grid-plus-shake
+behaviour (default) and a plain every-minute mode: the minute is always shown
+exact, redrawn every tick, no static and no shake needed at all
+(`prv_snow_permille()` returns 0 outright when `s_every_minute`; `disp_min` in
+`prv_digits_update_proc` takes the exact branch either way; `prv_tick_handler`
+drops its grid `step` to 1). Saved via the standard Pebble config-page handoff
+(`settings.html`'s Save button navigates to `pebblejs://close#<json>`;
+`index.js`'s `webviewclosed` listener relays it as an AppMessage).
+
+**Why:** Touch input would be the natural way to ask a watchface for the
+exact time on demand — tap the screen, see it — but Pebble currently
+restricts `TouchService` to watchapps, not watchfaces (see the touch-cost
+discussion this came out of). Shake/tap-to-reveal is the workaround for that
+restriction; not everyone wants the friction of a deliberate gesture just to
+read the exact minute, so this setting gives the alternative: give up the
+soft-minute identity and static/shake mechanic entirely, get a normal
+always-accurate clock instead.
+
+**Trade-off:** This is explicitly temporary — **remove this setting** (and
+the `RedrawMode` message key, `PERSIST_KEY_REDRAW_MODE`, `s_every_minute`, and
+the settings-page section) once touch is enabled for watchapps and legere can
+just let a screen tap reveal the exact minute, matching how shake/tap already
+work. Until then it's one more piece of state and one more settings-page
+section for what should eventually be unnecessary. Also reopens "no custom
+settings UI" as a v1 stance — accepted, since the alternative (no way to opt
+out of the static/shake mechanic at all) is worse for someone who just wants
+a normal watch.
 
 ## Locale support: Latin-script only
 

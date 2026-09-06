@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-_Nothing yet._
+- Added a "Time refresh" setting on the phone settings page: the default
+  5-minute-grid-plus-shake behavior, or a plain every-minute mode with no
+  static and no shake needed (minute is always exact). This is a stopgap
+  until touch is enabled for watchapps — it'll be removed once a screen tap
+  can do the same job.
 
 ## 2026-09-06
 

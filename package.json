@@ -29,7 +29,8 @@
       "Shakes",
       "Battery",
       "QuietMask",
-      "Done"
+      "Done",
+      "RedrawMode"
     ],
     "resources": {
       "media": [

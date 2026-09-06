@@ -12,6 +12,12 @@
   substitutes the LOG_INIT marker in the script below with the CSV pulled from
   the watch; with no data (static preview, watch not connected) the section
   stays hidden.  (Marker written split here so this comment isn't the match.)
+
+  The "Time refresh" section is a real setting (also a stopgap — see
+  decisions.md — removed once touch is enabled for watchapps). Saving
+  navigates to pebblejs://close#<json>, the standard Pebble config-page
+  handoff: index.js's 'webviewclosed' listener relays the choice to the watch
+  as an AppMessage (MESSAGE_KEY_RedrawMode), which persists it.
 -->
 <html lang="en">
 <head>
@@ -56,6 +62,10 @@
   .btn { font: inherit; font-size: 15px; font-weight: 600; padding: 10px 18px; border-radius: 10px;
          border: 1px solid var(--line); background: #1f1f1f; color: var(--ink); cursor: pointer; }
   .btn:active { background: #2a2a2a; }
+  .radio-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; }
+  .radio-row input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+  .radio-row span { color: var(--ink); font-size: 14px; }
+  .radio-row + .radio-row { border-top: 1px solid var(--line); }
   textarea { width: 100%; height: 38vh; margin-top: 12px; font-family: ui-monospace, Menlo, monospace;
              font-size: 12px; color: var(--ink); background: #0e0e0e; border: 1px solid var(--line);
              border-radius: 10px; padding: 10px; resize: vertical; }
@@ -69,6 +79,23 @@
     <p class="tagline">A quiet watchface. The minute reads as static until you shake your wrist to lock on.</p>
   </header>
   <main class="body">
+    <section>
+      <p class="seclabel">Time refresh</p>
+      <div class="card">
+        <p>How the minute updates while you're wearing it. This is a stopgap
+          until touch is enabled for watchapps &mdash; it'll go away once you
+          can just tap the screen instead.</p>
+        <label class="radio-row">
+          <input type="radio" name="redrawMode" value="0" checked>
+          <span>Every 5 minutes &mdash; shake to reveal the exact minute</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="redrawMode" value="1">
+          <span>Every minute &mdash; always exact, no shake needed</span>
+        </label>
+        <p style="margin-top:12px"><button class="btn" id="saveRedrawMode">Save</button></p>
+      </div>
+    </section>
     <section id="logSection" hidden>
       <p class="seclabel">Diagnostic log <span class="tmp">&middot; temporary</span></p>
       <div class="card">
@@ -98,6 +125,26 @@
 </div>
 <script>
   /*LOG_INIT*/
+  (function () {
+    // Runs regardless of LOG (unlike the diagnostic-log block below) - the
+    // redraw-mode setting is real even with no watch data (preview mode).
+    var mode = (typeof LOG !== 'undefined' && LOG.redrawMode) ? 1 : 0;
+    var radios = document.getElementsByName('redrawMode');
+    for (var i = 0; i < radios.length; i++) {
+      radios[i].checked = (Number(radios[i].value) === mode);
+    }
+    document.getElementById('saveRedrawMode').onclick = function () {
+      var selected = 0;
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) selected = Number(radios[i].value);
+      }
+      // Standard Pebble config-page handoff: navigating to pebblejs://close#
+      // closes this webview and delivers the payload to index.js's
+      // 'webviewclosed' listener, which relays it to the watch as AppMessage.
+      window.location = 'pebblejs://close#' +
+        encodeURIComponent(JSON.stringify({ redrawMode: selected }));
+    };
+  }());
   (function () {
     if (typeof LOG === 'undefined') return; // static preview, or no data from the watch
     document.getElementById('logSection').hidden = false;
