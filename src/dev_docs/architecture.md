@@ -99,7 +99,7 @@ reflective LCD). Anti-aliased edge pixels (not pure white) are left, so the
 glyph keeps a clean outline. `permille` comes from `prv_snow_permille()`: while a
 ramp is in flight it wins over `s_exact` — lock-on steps `SHIMMER_FRAMES → 0` as
 `PASSIVE_SNOW_PERMILLE → 0`, lock-out (`s_shimmer_out`) steps it the reverse;
-otherwise `PASSIVE_SNOW_PERMILLE` (450, dialed back from a full 1000) when
+otherwise `PASSIVE_SNOW_PERMILLE` (350, dialed back from a full 1000) when
 passive, 0 when exact. `s_shimmer_left` is an `AppTimer` countdown started by
 `prv_refresh_to_exact` (lock-on) or `prv_tick_handler` (lock-out); the lock-out
 ramp's final `prv_shimmer_tick` clears `s_exact`.
