@@ -18,11 +18,15 @@ ROW = re.compile(r'row (\d{2}/\d{2}/\d{4},\d{2},(?:yes|no),\d+(?:,\d+)?)')
 
 def main(path):
     print('date,hour,quiet_hour,shakes,battery')
+    rows = []
     with open(path) as f:
         for line in f:
             m = ROW.search(line)
             if m:
-                print(m.group(1))
+                rows.append(m.group(1))
+    # Log capture is oldest-first; match the phone app's CSV, newest at top.
+    for row in reversed(rows):
+        print(row)
 
 
 if __name__ == '__main__':

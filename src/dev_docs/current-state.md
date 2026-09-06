@@ -16,12 +16,12 @@
 - Freshness signal is **the minute static alone**: minute digits rendered as TV
   static when passive, resolving to solid white on a shake via a ~320 ms lock-on
   ramp — `prv_snow_permille()` steps the snowed fraction of the minute ink
-  1000→0 over `SHIMMER_FRAMES` (`prv_staticify` + `s_shimmer_left` /
-  `prv_shimmer_tick`). The ramp is symmetric: when the clock ticks past the
-  locked minute it plays in reverse (`s_shimmer_out`, 0→1000), so the minute
-  decays back into static rather than cutting out in one frame. The whole date
-  row is a constant mid blue (`DATE_COLOR`, `GColorVividCerulean`) — no red/blue
-  freshness cue there any more.
+  `PASSIVE_SNOW_PERMILLE`→0 (700, dialed back from a full 1000) over
+  `SHIMMER_FRAMES` (`prv_staticify` + `s_shimmer_left` / `prv_shimmer_tick`).
+  The ramp is symmetric: when the clock ticks past the locked minute it plays
+  in reverse (`s_shimmer_out`), so the minute decays back into static rather
+  than cutting out in one frame. The whole date row is a constant
+  `GColorWhite` (`DATE_COLOR`) — no red/blue freshness cue there any more.
 - 12/24h from the system (`clock_is_24h_style`).
 - Repaint skipped whenever it would not change the screen (`s_drawn_hour` /
   `s_drawn_min`).

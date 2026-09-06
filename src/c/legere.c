@@ -21,11 +21,9 @@ static GFont s_date_font;
 static bool s_date_font_custom;
 
 // Whole date line is drawn in this one colour (no freshness signal on the date
-// row any more — only the minute static carries that). A mid blue: bright enough
-// to read on the unlit transflective LCD, but blue rather than the cyan of
-// GColorElectricBlue. HW-tune: GColorBlueMoon is one step deeper if this washes
-// out, GColorElectricBlue one step lighter if it's too dim.
-#define DATE_COLOR GColorVividCerulean
+// row any more — only the minute static carries that). Hardcoded white: reads
+// cleanly on the unlit transflective LCD without adding a second signal colour.
+#define DATE_COLOR GColorWhite
 
 // The hour/minute digits are pre-rendered bitmaps (a font can't be rasterised
 // big enough on-watch). One sprite sheet of 10 fixed-width slots, sliced into
@@ -54,15 +52,20 @@ static int s_shimmer_left = 0;         // frames remaining in the ramp (SHIMMER_
 static bool s_shimmer_out = false;     // true = ramp running snow-ward (lock lost), false = lock-on
 static AppTimer *s_shimmer_timer = NULL;
 
+// Ceiling on passive snow density, in permille of the minute-ink pixels — dialed
+// back from a full 1000 (every pixel) so the passive face reads as static
+// without being quite so agitated.
+#define PASSIVE_SNOW_PERMILLE 700
+
 // Snow density for the current frame, in permille of the minute-ink pixels:
-// 1000 = every pixel (passive / no signal), 0 = clean. A ramp in flight wins
-// over s_exact: lock-on steps 1000->0, lock-out steps 0->1000.
+// PASSIVE_SNOW_PERMILLE = passive / no signal, 0 = clean. A ramp in flight wins
+// over s_exact: lock-on steps PASSIVE_SNOW_PERMILLE->0, lock-out steps the reverse.
 static int prv_snow_permille(void) {
   if (s_shimmer_left > 0) {
     int snowed = s_shimmer_out ? SHIMMER_FRAMES - s_shimmer_left : s_shimmer_left;
-    return snowed * 1000 / SHIMMER_FRAMES;
+    return snowed * PASSIVE_SNOW_PERMILLE / SHIMMER_FRAMES;
   }
-  return s_exact ? 0 : 1000;
+  return s_exact ? 0 : PASSIVE_SNOW_PERMILLE;
 }
 
 static int s_digit_band_top; // top y of the digit grid

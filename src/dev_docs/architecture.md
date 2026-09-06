@@ -29,7 +29,7 @@ backlight on ──┼── force an exact repaint (s_exact = true), unless not
           └── minute digits(white, then prv_staticify() snows a fraction: all when
           │                 passive, ramping to none over the lock-on / back to all on lock-out)
         prv_date_update_proc    (s_date_layer — only marked dirty on a date rollover)
-          └── date row     (weekday / day / month; whole row a constant mid blue)
+          └── date row     (weekday / day / month; whole row a constant white)
 ```
 
 ## Rendering
@@ -83,10 +83,10 @@ foot/head collision this causes is intentional and accepted.
   static rather than cutting out in one frame.
 - **Hour row**: always solid `GColorDarkGray`, never flickers — the hour is
   always exact, so signalling anything on it would be a lie.
-- **Date row**: whole line a constant mid blue (`DATE_COLOR`,
-  `GColorVividCerulean`). It used to carry a red/blue freshness cue on the month;
-  dropped — the static already says it, and a mid blue reads on the unlit LCD
-  where the old white day-of-month barely did.
+- **Date row**: whole line a constant `GColorWhite` (`DATE_COLOR`). It used to
+  carry a red/blue freshness cue on the month, then a mid-blue whole-row tint;
+  both dropped — the static already says it, and hardcoded white is the
+  simplest thing that reads on the unlit LCD.
 
 Hour/minute digits are tinted by `prv_set_ink()` poking the sprite sheet's
 palette in-place before each blit. The static is `prv_staticify(ctx, rect,
@@ -98,7 +98,8 @@ black — a real dropout spread, not just greys, so it reads on the unlit
 reflective LCD). Anti-aliased edge pixels (not pure white) are left, so the
 glyph keeps a clean outline. `permille` comes from `prv_snow_permille()`: while a
 ramp is in flight it wins over `s_exact` — lock-on steps `SHIMMER_FRAMES → 0` as
-`1000 → 0`, lock-out (`s_shimmer_out`) steps it `0 → 1000`; otherwise 1000 when
+`PASSIVE_SNOW_PERMILLE → 0`, lock-out (`s_shimmer_out`) steps it the reverse;
+otherwise `PASSIVE_SNOW_PERMILLE` (700, dialed back from a full 1000) when
 passive, 0 when exact. `s_shimmer_left` is an `AppTimer` countdown started by
 `prv_refresh_to_exact` (lock-on) or `prv_tick_handler` (lock-out); the lock-out
 ramp's final `prv_shimmer_tick` clears `s_exact`.

@@ -20,11 +20,11 @@ function openPage() {
 
   var rows = ['date,hour,quiet_hour,shakes,battery'];
   days.sort(function (a, b) {
-    return (a.year - b.year) || (a.mon - b.mon) || (a.mday - b.mday);
+    return (b.year - a.year) || (b.mon - a.mon) || (b.mday - a.mday);
   });
   days.forEach(function (d) {
     var date = pad2(d.mday) + '/' + pad2(d.mon) + '/' + d.year;
-    for (var h = 0; h < 24; h++) {
+    for (var h = 23; h >= 0; h--) {
       var quiet = (d.quietMask & (1 << h)) ? 'yes' : 'no';
       var bat = d.battery[h];
       rows.push(date + ',' + pad2(h) + ',' + quiet + ',' + d.shakes[h] + ',' +
