@@ -87,39 +87,31 @@ is the grill session captured in `decisions.md`.
   so the real localised strings are still untested. Install FR (worst case) + DE
   packs on emery, confirm the row fits unlit and the accented caps render.
 
-## Instrumentation (temporary — all of this comes out at store launch)
+## Instrumentation — removed 2026-09-07
 
-- [x] **Add hourly battery-% to `DayRecord`.** Done — `battery[24]` (last member,
-  `0xFF` = no sample), sampled on the existing hourly path in `prv_tick_handler`
-  via `battery_state_service_peek().charge_percent`, folded into the quiet-mask
-  persist-on-change block. In the AppMessage export (`Battery` key), the
-  `APP_LOG` "row" line, and `pebble-log-to-csv.py` as a `battery` column
-  (integer percent — the API has no sub-integer resolution). Purpose: spot
-  legere doing something dumb on my own wrist. Not a grid A/B.
-- [ ] **Removal checklist for store launch:** `DayRecord` + persist ring
-  (incl. `battery[24]`), `prv_log_trigger` / `prv_ensure_today` /
-  `prv_persist_today` / `prv_day_key`, the whole `--- Phone export ---` block,
-  `prv_outbox_*` / `prv_inbox_received` handlers, the `APP_LOG` "row" and
-  "shake-wake" lines, `tools/pebble-log-to-csv.py`, the
-  `Year`/`Mon`/`Mday`/`Shakes`/`Battery`/`QuietMask`/`Done`/`RequestLog` message
-  keys. The `battery` CSV column in `index.js` + `open_config.js`.
-  In pkjs: the log-fetch code in `src/pkjs/index.js` (back down to just the
-  `showConfiguration` opener), the `#logSection` + its `<script>` in
-  `settings.html` (regen `settings-html.js`), the `--log` branch in
-  `open_config.js`. **Keep** `src/pkjs/index.js` (the opener), `settings.html`,
-  and the `configurable` capability — they serve the ko-fi page.
+- [x] **All diagnostic instrumentation removed.** `DayRecord` + persist ring,
+  `prv_log_trigger` / `prv_ensure_today` / `prv_persist_today` / `prv_day_key`,
+  the `--- Phone export ---` block + `prv_outbox_*` handlers, the per-minute
+  battery/Quiet-Time sampler, the `APP_LOG` "row"/"shake-wake" lines,
+  `tools/pebble-log-to-csv.py`, seven of the eight message keys, the log-fetch
+  code in `index.js`, and the `#logSection` + `--log` branch in `settings.html`
+  / `open_config.js`. The audit found the per-minute `persist_write_data` was
+  the only meaningful battery/flash cost in the codebase and the grid question
+  it answered is settled. **Kept:** shake-to-wake, the `RedrawMode` setting +
+  settings page (`prv_inbox_received_handler` trimmed to just that branch;
+  `app_message_open(..., 0)`, inbox-only), the `configurable` capability. Old
+  persist keys (190, 200–213) on installed watches left to rot — no migration.
 
 ## Store v1
 
 - [x] **ko-fi link in the settings page.** Done — `src/pkjs/settings.html`
   (editable source) + generated `settings-html.js` wrapper + `src/open_config.js`
-  dev helper, same pattern as `~/src/tidepebble`. Page: temporary diagnostic-log
-  section (CSV + Share, injected by `index.js`), then tagline, GitHub issues
-  link, ko-fi button. `showConfiguration` opens it as a data: URI.
+  dev helper, same pattern as `~/src/tidepebble`. Page: Time refresh setting,
+  then tagline, GitHub issues link, ko-fi button. `showConfiguration` opens it
+  as a data: URI.
 - [ ] **Listing pass.** Store assets (icon sizes, banner, screenshots),
   description copy. Pull the battery guidance from `architecture.md` → "Battery
   guidance (for the store listing)" into the description.
-- [ ] Remove the diagnostic instrumentation (checklist above) before submitting.
 - [x] `author` in `package.json` set to `ModusApps` (matches `~/src/tidepebble`).
   Still confirm `displayName` (`legere`) / `uuid` before store submit.
 

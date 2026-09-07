@@ -13,15 +13,15 @@ see `decisions.md` → "The 5-minute grid is an identity choice, not a power
 optimisation"). It is a low-*fuss* face that also happens to do nothing
 wasteful.
 
-Single-file watch app. The phone companion is just a static settings page
-(info + ko-fi link); there is no configurable state.
+Single-file watch app. The phone companion is a settings page (info + ko-fi
+link) with one real setting — "Time refresh" (`s_every_minute`, persisted;
+see `decisions.md`).
 
 ```
 tick (every minute, from the OS)
-  ├── advance the day-record ring, sample Quiet Time flag
   ├── if a forced-exact reading's minute has ticked over: pin s_passive_min to
   │   the real minute, start the reverse ramp (clears s_exact on its last frame)
-  ├── on the 5-minute grid (Quiet Time or not): mark dirty, passive repaint
+  ├── on the 5-minute grid (every minute if s_every_minute): mark dirty, passive repaint
   │
 shake / tap  ──┐
 backlight on ──┼── force an exact repaint (s_exact = true), unless nothing would change
@@ -198,40 +198,16 @@ almost entirely by system settings. What to tell users in the listing:
 With all of that, ~21 days is realistic and legere does nothing to stop it. None
 of it is legere-specific; it applies to any minimal watchface.
 
-## Diagnostic log (temporary)
+## Diagnostic log — removed 2026-09-07
 
-A `DayRecord` ring buffer (`DAYS_KEPT = 14`, 56 B/day in persist storage) records
-per-hour shake-trigger counts, a Quiet Time bitmask, and per-hour battery
-`charge_percent` (`battery[24]`, `0xFF` = no sample; last member so pre-battery
-32 B blobs still read back cleanly). Battery is sampled on the same hourly path
-as the Quiet Time flag. CSV columns: `date,hour,quiet_hour,shakes,battery`
-(battery integer percent). Two export paths, both hour-by-hour — neither
-ever writes a row for an hour that hasn't happened yet:
-
-- **`APP_LOG` rows** in the exact CSV shape, emitted **only when an hour
-  finishes** (the first tick of the next hour, `prv_tick_handler`). The
-  in-progress hour is never logged; earlier hours today land in the log only if
-  `pebble logs` was capturing across each hour boundary.
-  `pebble logs | tee watch.log` then `tools/pebble-log-to-csv.py`, which
-  buffers the matched rows and prints them newest-first (the log capture
-  itself is oldest-first).
-- **AppMessage** → `src/pkjs/index.js` → the settings page's "Diagnostic log"
-  section (CSV + Web Share / textarea). `prv_inbox_received_handler` catches
-  `RequestLog` and `prv_export_send_next` streams every non-empty persist slot,
-  **including today's partial record** (created + persisted by the first tick
-  after midnight), paced by `prv_outbox_sent_handler`, then `Done`. `openPage()`
-  in `index.js` sorts days newest-first and each day's hours 23→0, skips any
-  hour whose `battery` sample is still `255` (the init value — meaning that
-  hour hasn't happened yet on the in-progress day) before building the CSV, so
-  the exported log lists newest first and never has placeholder rows for the
-  rest of today.
-
-Note both paths read persist storage, which `pebble install` **wipes** — after a
-reinstall there is no history, only what has accrued since.
-
-Q17 (grill): the temporary hourly **battery-%** sample (above) is there to catch
-legere doing something dumb while the face is being finished, not to justify the
-grid. **All of this instrumentation comes out at store launch.**
+A `DayRecord` persist ring (per-hour shake counts, Quiet Time bitmask, hourly
+battery %), an AppMessage export to the settings page, and hourly `APP_LOG`
+"row" lines + `tools/pebble-log-to-csv.py` were carried while the 5-minute grid
+question was open. Removed once that was settled — see `decisions.md`. An audit
+for battery/flash cost found the sampler's per-minute `persist_write_data` was
+the only non-trivial drain in the codebase; nothing replaced it. The one
+surviving message key is `RedrawMode` (the Time refresh setting), which is
+inbox-only now — the watch never sends anything to the phone.
 
 ## Platforms
 

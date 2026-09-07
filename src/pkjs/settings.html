@@ -5,19 +5,15 @@
 
     node -e 'const fs=require("fs");fs.writeFileSync("src/pkjs/settings-html.js","module.exports = "+JSON.stringify(fs.readFileSync("src/pkjs/settings.html","utf8"))+";\n")'
 
-  Preview in a browser with:  node src/open_config.js
+  Preview in a browser with:  node src/open_config.js  (--redraw=1 pre-selects
+  the "every minute" radio)
 
-  The "Diagnostic log" section is TEMPORARY — it comes out with the rest of the
-  shake-log instrumentation at store launch (see src/dev_docs/todo.md). index.js
-  substitutes the LOG_INIT marker in the script below with the CSV pulled from
-  the watch; with no data (static preview, watch not connected) the section
-  stays hidden.  (Marker written split here so this comment isn't the match.)
-
-  The "Time refresh" section is a real setting (also a stopgap — see
-  decisions.md — removed once touch is enabled for watchapps). Saving
-  navigates to pebblejs://close#<json>, the standard Pebble config-page
-  handoff: index.js's 'webviewclosed' listener relays the choice to the watch
-  as an AppMessage (MESSAGE_KEY_RedrawMode), which persists it.
+  The "Time refresh" section is a real setting (a stopgap — see decisions.md —
+  removed once touch is enabled for watchapps). index.js substitutes the INIT
+  marker in the script below with `var REDRAW_MODE=<0|1>` (its last saved
+  value). Saving navigates to pebblejs://close#<json>, the standard Pebble
+  config-page handoff: index.js's 'webviewclosed' listener relays the choice to
+  the watch as an AppMessage (MESSAGE_KEY_RedrawMode), which persists it.
 -->
 <html lang="en">
 <head>
@@ -51,7 +47,6 @@
   .tagline { color: var(--gray); font-size: 14px; margin: 12px 0 0; max-width: 36ch; }
   .body { flex: 1 1 auto; padding: var(--pad); display: flex; flex-direction: column; gap: 16px; }
   .seclabel { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--faint); margin: 6px 0 0 2px; }
-  .seclabel .tmp { color: var(--faint); font-weight: 600; letter-spacing: 0.6px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: clamp(16px, 4.5vw, 20px); }
   .card p { margin: 0 0 12px; color: var(--gray); font-size: 14px; }
   .card p:last-child { margin-bottom: 0; }
@@ -66,9 +61,6 @@
   .radio-row input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
   .radio-row span { color: var(--ink); font-size: 14px; }
   .radio-row + .radio-row { border-top: 1px solid var(--line); }
-  textarea { width: 100%; height: 38vh; margin-top: 12px; font-family: ui-monospace, Menlo, monospace;
-             font-size: 12px; color: var(--ink); background: #0e0e0e; border: 1px solid var(--line);
-             border-radius: 10px; padding: 10px; resize: vertical; }
   .foot { padding: 0 var(--pad) calc(24px + var(--sab)); color: var(--faint); font-size: 12px; }
 </style>
 </head>
@@ -82,9 +74,7 @@
     <section>
       <p class="seclabel">Time refresh</p>
       <div class="card">
-        <p>How the minute updates while you're wearing it. This is a stopgap
-          until touch is enabled for watchapps &mdash; it'll go away once you
-          can just tap the screen instead.</p>
+        <p>How the minute updates while you're wearing it.</p>
         <label class="radio-row">
           <input type="radio" name="redrawMode" value="0" checked>
           <span>Every 5 minutes &mdash; shake to reveal the exact minute</span>
@@ -94,15 +84,6 @@
           <span>Every minute &mdash; always exact, no shake needed</span>
         </label>
         <p style="margin-top:12px"><button class="btn" id="saveRedrawMode">Save</button></p>
-      </div>
-    </section>
-    <section id="logSection" hidden>
-      <p class="seclabel">Diagnostic log <span class="tmp">&middot; temporary</span></p>
-      <div class="card">
-        <p id="logSummary">Fetching from watch&hellip;</p>
-        <p><button class="btn" id="share">Share CSV</button></p>
-        <p>If sharing doesn't open a menu, copy the text below:</p>
-        <textarea id="logCsv" readonly></textarea>
       </div>
     </section>
     <section>
@@ -124,11 +105,11 @@
   <p class="foot">legere &middot; watchface for Pebble</p>
 </div>
 <script>
-  /*LOG_INIT*/
+  /*INIT*/
   (function () {
-    // Runs regardless of LOG (unlike the diagnostic-log block below) - the
-    // redraw-mode setting is real even with no watch data (preview mode).
-    var mode = (typeof LOG !== 'undefined' && LOG.redrawMode) ? 1 : 0;
+    // index.js replaces the INIT marker with `var REDRAW_MODE=<0|1>`; missing
+    // in a plain static preview, so default to 0.
+    var mode = (typeof REDRAW_MODE !== 'undefined') ? REDRAW_MODE : 0;
     var radios = document.getElementsByName('redrawMode');
     for (var i = 0; i < radios.length; i++) {
       radios[i].checked = (Number(radios[i].value) === mode);
@@ -143,24 +124,6 @@
       // 'webviewclosed' listener, which relays it to the watch as AppMessage.
       window.location = 'pebblejs://close#' +
         encodeURIComponent(JSON.stringify({ redrawMode: selected }));
-    };
-  }());
-  (function () {
-    if (typeof LOG === 'undefined') return; // static preview, or no data from the watch
-    document.getElementById('logSection').hidden = false;
-    document.getElementById('logSummary').textContent =
-      LOG.days ? LOG.days + ' day(s) on the watch.' : 'No records on the watch yet.';
-    var ta = document.getElementById('logCsv');
-    ta.value = LOG.csv;
-    ta.onclick = function () { this.select(); };
-    document.getElementById('share').onclick = function () {
-      if (!navigator.share) { ta.select(); return; }
-      var data = { title: 'shake-log.csv', text: LOG.csv };
-      try {
-        var file = new File([LOG.csv], 'shake-log.csv', { type: 'text/csv' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) data = { files: [file] };
-      } catch (e) {}
-      navigator.share(data).catch(function () {});
     };
   }());
 </script>

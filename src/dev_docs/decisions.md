@@ -280,44 +280,31 @@ Emery picks 24px or 20px at load
 FR/ES overrun 24px ("SEPT." + accented period-weekdays), the rest keep 24.
 Untested with a real non-English language pack — the emulator can't install one.
 
-## Diagnostic instrumentation is temporary
+## Diagnostic instrumentation — removed 2026-09-07
 
-**Chose:** The `DayRecord` ring buffer, AppMessage export, `pebble-log-to-csv.py`,
-and the `APP_LOG` "row"/"shake-wake" lines all get removed at store launch. A
-temporary hourly battery-% sample (`DayRecord.battery[24]`, integer percent,
-`0xFF` = no sample) is in `DayRecord` in the meantime, surfaced as the CSV
-`battery` column.
+**Was:** A `DayRecord` persist ring (per-hour shake counts, a Quiet Time
+bitmask, hourly battery %), an AppMessage export to the settings page, hourly
+`APP_LOG` "row" lines + `pebble-log-to-csv.py`, and the settings-page
+"Diagnostic log" section. Carried to check whether the 5-minute grid was worth
+keeping vs. redrawing every minute, and to spot the face misbehaving on the
+author's own wrist.
 
-**Why:** With the grid reframed as identity (not power), the log has nothing left
-to prove. It stays only as a "is legere doing something dumb on my own wrist"
-check while the face is finished.
+**Removed because:** the grid question is settled (identity, not power — see
+above), so the log had nothing left to prove. An audit for battery/flash cost
+then found the instrumentation was the *only* non-trivial drain in the
+codebase: `prv_tick_handler` did a 56-byte `persist_write_data` every time the
+reported battery % dropped a step (~10–100 writes/day) plus one per manual
+refresh — real energy, and it burns the persist region's ~100k-cycle wear
+budget. Shipping code was otherwise clean.
 
-**Trade-off:** Message keys (`RequestLog`, `Year`, `Mon`, `Mday`, `Shakes`,
-`Battery`, `QuietMask`, `Done`) and the `configurable` capability come back out of
-`package.json` when the export goes — unless the ko-fi settings page keeps a
-companion around, in which case the export code goes but the plumbing stays.
-
-## The phone-side CSV skips hours with no data, instead of dumping the whole day
-
-**Chose:** `openPage()` in `src/pkjs/index.js` now skips any hour whose
-`battery` sample is still `255` before writing CSV rows, instead of writing
-all 24 hours of every persisted day unconditionally.
-
-**Why:** `battery[24]` is sampled every minute (`prv_tick_handler`), so `255`
-means that hour of the day hasn't happened yet — true for the rest of
-today's in-progress record, which the export always includes (see above).
-Before this, opening the settings page any time before 23:00 produced a CSV
-with a placeholder row for every hour later than "now" — `shakes` 0, `battery`
-blank, `quiet_hour` `no` — indistinguishable from a real quiet hour with no
-shakes. Writing the whole (mostly future) day's rows in one pass on every
-`openPage()` call was also the actual "write log lines … for the whole day
-at one time" behaviour this was meant to avoid — the watch-side `APP_LOG`
-path (above) already only ever writes one real row per finished hour.
-
-**Trade-off:** None identified — the skip only removes rows that carried no
-real information; nothing downstream (the settings page's textarea/Share,
-`tools/pebble-log-to-csv.py`) parses the CSV shape, so nothing depended on the
-old placeholder rows being present.
+**Kept:** shake-to-wake (`accel_tap_service`), the "Time refresh" setting
+(`RedrawMode`, now the only message key), the ko-fi settings page, and the
+`configurable` capability. The watch's AppMessage channel is inbox-only now
+(`app_message_open(..., 0)`). Old persist keys (190, 200–213) on installed
+watches are left in place — nothing reads them, no migration worth writing
+pre-launch. The phone remembers the Time refresh choice in `localStorage`
+rather than reading it back from the watch, since the watch→phone export path
+is gone.
 
 ## Platforms: emery + gabbro only
 

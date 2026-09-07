@@ -120,124 +120,9 @@ static int prv_display_hour(const struct tm *t) {
   return h;
 }
 
-// Shake/tap-triggered-refresh log, kept per calendar day so it can be pulled
-// to the phone and exported — instrumentation to check whether the 5-minute
-// grid is worth keeping vs. just redrawing every minute.
-//
-// ponytail: DAYS_KEPT days ring-buffered in persist storage (56B/day, well
-// under the persist quota). Bump it if more history is needed.
-#define DAYS_KEPT 14
-#define PERSIST_KEY_DAY_CURSOR 190          // int: index of "today"'s slot
-#define PERSIST_KEY_DAY_BASE 200            // blobs: 200..200+DAYS_KEPT-1
-
-typedef struct __attribute__((__packed__)) {
-  int16_t year;         // full year, e.g. 2026; 0 = empty slot
-  uint8_t mon;           // 1-12
-  uint8_t mday;          // 1-31
-  uint8_t shakes[24];    // trigger count per hour-of-day, capped at 60
-  uint32_t quiet_mask;   // bit h set = Quiet Time was on during hour h
-  // battery must stay last: a pre-battery 32-byte blob then reads back
-  // year..quiet_mask exactly and leaves battery[] at its init value.
-  uint8_t battery[24];   // charge_percent sampled in hour h; 0xFF = no sample
-} DayRecord;
-
-static int s_day_cursor = -1;  // -1 = not loaded from persist yet this run
-static DayRecord s_today;
-
-static void prv_persist_today(void) {
-  persist_write_data(PERSIST_KEY_DAY_BASE + s_day_cursor, &s_today, sizeof(s_today));
-}
-
-// Loads/advances the day-record ring so s_today always matches the wall-clock
-// date. Cheap to call from every tick — it only does work on an actual
-// day change (or the first call after launch).
-static void prv_ensure_today(const struct tm *t) {
-  if (s_day_cursor < 0) {
-    s_day_cursor = persist_exists(PERSIST_KEY_DAY_CURSOR) ? persist_read_int(PERSIST_KEY_DAY_CURSOR) : 0;
-    memset(&s_today, 0, sizeof(s_today));
-    memset(s_today.battery, 0xFF, sizeof s_today.battery);
-    persist_read_data(PERSIST_KEY_DAY_BASE + s_day_cursor, &s_today, sizeof(s_today));
-  }
-  int year = t->tm_year + 1900, mon = t->tm_mon + 1, mday = t->tm_mday;
-  if (s_today.year != year || s_today.mon != mon || s_today.mday != mday) {
-    s_day_cursor = (s_day_cursor + 1) % DAYS_KEPT;
-    persist_write_int(PERSIST_KEY_DAY_CURSOR, s_day_cursor);
-    memset(&s_today, 0, sizeof(s_today));
-    memset(s_today.battery, 0xFF, sizeof s_today.battery);
-    s_today.year = year;
-    s_today.mon = mon;
-    s_today.mday = mday;
-    prv_persist_today();
-  }
-}
-
-static void prv_log_trigger(const struct tm *t) {
-  prv_ensure_today(t);
-  if (s_today.shakes[t->tm_hour] < 60) s_today.shakes[t->tm_hour]++;
-  prv_persist_today();
-  APP_LOG(APP_LOG_LEVEL_INFO, "shake-wake hour=%02d count=%d", t->tm_hour, s_today.shakes[t->tm_hour]);
-}
-
-// --- Phone export ------------------------------------------------------
-// The phone's config page asks for the log (MESSAGE_KEY_RequestLog); we
-// stream it back one day-record per AppMessage, paced by outbox_sent, then
-// send MESSAGE_KEY_Done. See src/pkjs/index.js for the receiving side.
-
-static int s_export_slot = -1;  // index of the last slot sent; -1 = nothing sent yet
-
-static void prv_export_finish(void) {
-  s_export_slot = -1;
-  DictionaryIterator *iter;
-  if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
-    // Rides along with Done so the settings page can pre-select the right
-    // radio for the current redraw mode when it opens.
-    dict_write_int32(iter, MESSAGE_KEY_RedrawMode, s_every_minute ? 1 : 0);
-    dict_write_int32(iter, MESSAGE_KEY_Done, 1);
-    dict_write_end(iter);
-    app_message_outbox_send();
-  }
-}
-
-static void prv_export_send_next(void) {
-  for (int i = s_export_slot + 1; i < DAYS_KEPT; i++) {
-    DayRecord rec;
-    memset(&rec, 0, sizeof(rec));
-    memset(rec.battery, 0xFF, sizeof rec.battery);
-    persist_read_data(PERSIST_KEY_DAY_BASE + i, &rec, sizeof(rec));
-    if (rec.year == 0) continue;  // slot never written
-
-    DictionaryIterator *iter;
-    if (app_message_outbox_begin(&iter) != APP_MSG_OK) return;  // will retry on next tap/reopen
-    dict_write_int32(iter, MESSAGE_KEY_Year, rec.year);
-    dict_write_int32(iter, MESSAGE_KEY_Mon, rec.mon);
-    dict_write_int32(iter, MESSAGE_KEY_Mday, rec.mday);
-    dict_write_data(iter, MESSAGE_KEY_Shakes, rec.shakes, sizeof(rec.shakes));
-    dict_write_data(iter, MESSAGE_KEY_Battery, rec.battery, sizeof(rec.battery));
-    dict_write_int32(iter, MESSAGE_KEY_QuietMask, (int32_t)rec.quiet_mask);
-    dict_write_end(iter);
-    app_message_outbox_send();
-    s_export_slot = i;
-    return;
-  }
-  prv_export_finish();
-}
-
-static void prv_outbox_sent_handler(DictionaryIterator *iterator, void *context) {
-  if (s_export_slot >= 0) prv_export_send_next();
-}
-
-static void prv_outbox_failed_handler(DictionaryIterator *iterator, AppMessageResult reason,
-                                      void *context) {
-  // ponytail: drop the export on failure rather than retrying — the phone
-  // just re-requests it (it re-sends RequestLog each time settings opens).
-  s_export_slot = -1;
-}
-
+// The phone settings page relays the "Time refresh" choice as
+// MESSAGE_KEY_RedrawMode; we persist it and re-sync the face immediately.
 static void prv_inbox_received_handler(DictionaryIterator *iterator, void *context) {
-  if (dict_find(iterator, MESSAGE_KEY_RequestLog)) {
-    s_export_slot = -1;
-    prv_export_send_next();
-  }
   Tuple *redraw_tuple = dict_find(iterator, MESSAGE_KEY_RedrawMode);
   if (redraw_tuple) {
     bool new_every_minute = redraw_tuple->value->int32 != 0;
@@ -282,7 +167,6 @@ static void prv_refresh_to_exact(void) {
       prv_display_hour(t) == s_drawn_hour && t->tm_min == s_drawn_min) {
     return;  // nothing would change — don't spend a repaint
   }
-  prv_log_trigger(t);
   s_exact = true;
   s_exact_hour = t->tm_hour;
   s_exact_min = t->tm_min;
@@ -507,57 +391,12 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, DATE_COLOR);
 }
 
-// ponytail stopgap: the official Pebble app doesn't surface a Settings
-// webview for sideloaded apps yet, so the AppMessage export above has no way
-// to fire. Until it does, log each finished hour's row directly — same
-// shape as the CSV — so `pebble logs` is a working export path today:
-//   pebble logs --phone <ip> | tee watch.log
-//   python3 tools/pebble-log-to-csv.py watch.log > shake-log.csv
-static int s_logged_hour = -1;
-static int s_logged_day_key = -1;  // year*10000 + mon*100 + mday
-
 // Minute of the last passive (schedule-driven) repaint, so a button press in
 // Quiet Time that lands in that same minute can be recognised as redundant.
 static int s_sched_hour = -1;
 static int s_sched_min = -1;
 
-// year*10000 + mon*100 + mday for s_today — a comparable key for "did the
-// date change", used both to detect rollover and to remember what was logged.
-static int prv_day_key(void) {
-  return s_today.year * 10000 + s_today.mon * 100 + s_today.mday;
-}
-
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  // Log the hour that just finished, using s_today as it stood *before*
-  // today's rollover below (so the last hour of a day still logs against
-  // the correct outgoing date).
-  int day_key = prv_day_key();
-  if (s_logged_hour >= 0 && day_key != 0 &&
-      (s_logged_hour != tick_time->tm_hour || s_logged_day_key != day_key)) {
-    bool was_quiet = (s_today.quiet_mask & (1UL << s_logged_hour)) != 0;
-    APP_LOG(APP_LOG_LEVEL_INFO, "row %02d/%02d/%04d,%02d,%s,%d,%d",
-            s_today.mday, s_today.mon, s_today.year, s_logged_hour,
-            was_quiet ? "yes" : "no", s_today.shakes[s_logged_hour],
-            s_today.battery[s_logged_hour]);
-  }
-
-  // Every-minute tick doubles as the sampler for the current hour's Quiet
-  // Time flag and battery level — last sample in the hour wins, which converges
-  // to the right answer since neither flaps minute to minute.
-  prv_ensure_today(tick_time);
-  bool quiet = quiet_time_is_active();
-  uint32_t bit = 1UL << tick_time->tm_hour;
-  uint32_t new_mask = quiet ? (s_today.quiet_mask | bit) : (s_today.quiet_mask & ~bit);
-  uint8_t new_bat = battery_state_service_peek().charge_percent;
-  if (new_mask != s_today.quiet_mask ||
-      s_today.battery[tick_time->tm_hour] != new_bat) {
-    s_today.quiet_mask = new_mask;
-    s_today.battery[tick_time->tm_hour] = new_bat;
-    prv_persist_today();
-  }
-  s_logged_hour = tick_time->tm_hour;
-  s_logged_day_key = prv_day_key();
-
   // A manual refresh shows the exact minute — but only that minute is true. Once
   // the clock ticks past it, play the lock-on ramp in reverse: the minute decays
   // back into static over ~320 ms rather than cutting out in one frame. The ramp
@@ -717,10 +556,10 @@ static void prv_init(void) {
   backlight_service_subscribe(prv_backlight_handler);
   accel_tap_service_subscribe(prv_tap_handler);
 
+  // Inbox only — the phone settings page pushes MESSAGE_KEY_RedrawMode; the
+  // watch never sends anything back, so the outbox is 0.
   app_message_register_inbox_received(prv_inbox_received_handler);
-  app_message_register_outbox_sent(prv_outbox_sent_handler);
-  app_message_register_outbox_failed(prv_outbox_failed_handler);
-  app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
+  app_message_open(app_message_inbox_size_maximum(), 0);
 }
 
 static void prv_deinit(void) {

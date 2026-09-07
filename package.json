@@ -22,14 +22,6 @@
       "configurable"
     ],
     "messageKeys": [
-      "RequestLog",
-      "Year",
-      "Mon",
-      "Mday",
-      "Shakes",
-      "Battery",
-      "QuietMask",
-      "Done",
       "RedrawMode"
     ],
     "resources": {

@@ -4,9 +4,12 @@
 
 - Added a "Time refresh" setting on the phone settings page: the default
   5-minute-grid-plus-shake behavior, or a plain every-minute mode with no
-  static and no shake needed (minute is always exact). This is a stopgap
-  until touch is enabled for watchapps — it'll be removed once a screen tap
-  can do the same job.
+  static and no shake needed (minute is always exact).
+- Removed the diagnostic shake-log instrumentation: the on-watch `DayRecord`
+  persist ring, the settings-page CSV export and "Diagnostic log" section,
+  the hourly log lines, and `tools/pebble-log-to-csv.py`. It had served its
+  purpose (confirming the 5-minute grid), and its per-minute persist write
+  was the only measurable battery/flash cost in the app.
 
 ## 2026-09-06
 
