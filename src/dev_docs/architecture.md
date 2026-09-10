@@ -61,7 +61,6 @@ grid in from both edges so its corners clear the bezel.
 | `DIGIT_BAND_BOT_GAP` | 5 | 6 | px between minute row and date row |
 | `top_margin` | 5 | 28 | |
 | `bot_margin` | n/a | 32 | gabbro only — emery derives `s_date_top` without it |
-| `MINUTE_ROW_SHIFT_X` | 15 | 15 | px the minute row is pulled left of the hour row's centred position (both platforms) |
 
 On emery `s_date_top` is derived from the same terms as the block-centering
 expression, so `block_top` collapses to `top_margin` and any vertical slack

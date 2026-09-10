@@ -8,8 +8,10 @@
   `GColorDarkGray`.
 - Gabbro: digits 73×80, rows a positive 6px apart, centred; hour row
   `GColorDarkGray`.
-- Minute row is offset `MINUTE_ROW_SHIFT_X` (15px) left of the hour row's
-  centred position, on both platforms — a slight horizontal stagger.
+- Hour and minute rows are both centred on the same axis (no horizontal
+  stagger). Within each row the two digits are flush-right in their fixed-width
+  slots (baked into the sprite sheet by `tools/gen-digits.sh`, `-gravity
+  SouthEast`), so all four digits align on a consistent right edge.
 - Passive 5-minute repaint grid, Quiet Time or not (no hourly fallback) — or
   a plain every-minute mode with no static/shake at all, if the user has
   picked that in the "Time refresh" setting (`s_every_minute`,

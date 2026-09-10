@@ -101,7 +101,6 @@ static int s_usable_w;
 // deliberately overlaps the hour row (dense stacked effect, hour drawn dark).
 #define DIGIT_GAP PBL_IF_ROUND_ELSE(6, -20)
 #define DIGIT_BAND_BOT_GAP PBL_IF_ROUND_ELSE(6, 5)  // px between the minute row and the date row
-#define MINUTE_ROW_SHIFT_X 10  // px the minute row is pulled left of the hour row's centred position
 
 static GSize prv_measure(const char *text, GFont font) {
   return graphics_text_layout_get_content_size(text, font, GRect(0, 0, 400, 300),
@@ -340,7 +339,6 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
     for (int row = 0; row < 2; row++) {
       int n = (row == 0 && blank_hour_tens) ? 1 : 2;  // digits shown on this row
       int row_x = grid_x + (grid_w - n * s_slot_w) / 2;
-      if (row == 1) row_x -= MINUTE_ROW_SHIFT_X;  // slight offset from the hour row above
       int y = block_top + row * (s_slot_h + DIGIT_GAP);
       if (row == 1) min_rect = GRect(row_x, y, n * s_slot_w, s_slot_h);
       for (int k = 0; k < n; k++) {
