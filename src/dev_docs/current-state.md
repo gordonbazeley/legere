@@ -56,7 +56,8 @@
 - Launcher icon (`resources/images/icon.png`) reads on any launcher background
   (white glyph + black keyline).
 - Builds via `pebble build`; `tools/strip-js-sourcemap.sh` drops the unused
-  ~5.7 KB JS source map from the `.pbw`.
+  ~5.7 KB JS source map from the `.pbw`; `src/build_store.sh` also minifies
+  the JS and copies the `.pbw` to `~/Nextcloud/pbws`.
 
 ## Not done yet — see `todo.md`
 
@@ -136,3 +137,4 @@
 | `tools/punch-holes.py` | Grows enclosed counters without touching the outer silhouette |
 | `tools/quantize-alpha.py` | Quantises glyph-edge alpha to N even steps |
 | `tools/strip-js-sourcemap.sh` | Drops `pebble-js-app.js.map` from the `.pbw` |
+| `src/build_store.sh` | Store build: strip map, minify JS, copy to `~/Nextcloud/pbws` |
