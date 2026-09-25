@@ -2,11 +2,13 @@
 //
 // showConfiguration opens the settings page (src/pkjs/settings.html, bundled as
 // the generated string in settings-html.js): an info + support page with a
-// ko-fi link, plus the "Time refresh" setting (real, see decisions.md).
+// ko-fi link, plus the "Time refresh" and "Night colour" settings (real, see
+// decisions.md).
 //
-// "Time refresh" is relayed to the watch as MESSAGE_KEY_RedrawMode, which the
-// watch persists and reads at boot. The phone keeps the last saved value in
-// localStorage only to pre-select the radio next time the page opens.
+// Both are relayed to the watch as AppMessages (MESSAGE_KEY_RedrawMode,
+// MESSAGE_KEY_NightEnabled/NightStart/NightEnd), which the watch persists and
+// reads at boot. The phone keeps the last saved values in localStorage only
+// to pre-fill the settings page next time it opens.
 
 function currentRedrawMode() {
   try {
@@ -16,9 +18,22 @@ function currentRedrawMode() {
   }
 }
 
+function currentNight() {
+  try {
+    return {
+      enabled: localStorage.getItem('nightEnabled') === '1',
+      start: Number(localStorage.getItem('nightStart') || 22),
+      end: Number(localStorage.getItem('nightEnd') || 7),
+    };
+  } catch (e) {
+    return { enabled: false, start: 22, end: 7 };
+  }
+}
+
 Pebble.addEventListener('showConfiguration', function () {
-  var html = require('./settings-html').replace(
-    '/*INIT*/', 'var REDRAW_MODE=' + currentRedrawMode() + ';');
+  var init = 'var REDRAW_MODE=' + currentRedrawMode() + ';' +
+    'var NIGHT=' + JSON.stringify(currentNight()) + ';';
+  var html = require('./settings-html').replace('/*INIT*/', init);
   Pebble.openURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 });
 
@@ -35,5 +50,17 @@ Pebble.addEventListener('webviewclosed', function (e) {
   if (settings.redrawMode !== undefined) {
     try { localStorage.setItem('redrawMode', String(settings.redrawMode)); } catch (e) {}
     Pebble.sendAppMessage({ 'RedrawMode': settings.redrawMode });
+  }
+  if (settings.nightEnabled !== undefined) {
+    try {
+      localStorage.setItem('nightEnabled', String(settings.nightEnabled));
+      localStorage.setItem('nightStart', String(settings.nightStart));
+      localStorage.setItem('nightEnd', String(settings.nightEnd));
+    } catch (e) {}
+    Pebble.sendAppMessage({
+      'NightEnabled': settings.nightEnabled,
+      'NightStart': settings.nightStart,
+      'NightEnd': settings.nightEnd,
+    });
   }
 });

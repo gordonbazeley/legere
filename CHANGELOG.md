@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a "Night colour" setting on the phone settings page: dims the face
+  to red (digits, date, and the minute static) during a user-set 24-hour
+  window, to cut blue/white light at night. Off by default.
 - Added a "Time refresh" setting on the phone settings page: the default
   5-minute-grid-plus-shake behavior, or a plain every-minute mode with no
   static and no shake needed (minute is always exact).

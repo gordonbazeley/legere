@@ -6,6 +6,7 @@
 //
 //   node src/open_config.js               # radio pre-selected to "every 5 minutes"
 //   node src/open_config.js --redraw=1    # radio pre-selected to "every minute"
+//   node src/open_config.js --night=1     # night colour checkbox pre-checked
 
 var http = require('http');
 var fs = require('fs');
@@ -20,10 +21,13 @@ if (!fs.existsSync(SETTINGS_HTML)) {
 
 var redrawArg = process.argv.filter(function (a) { return a.indexOf('--redraw=') === 0; })[0];
 var redrawMode = redrawArg ? Number(redrawArg.split('=')[1]) : 0;
+var nightArg = process.argv.filter(function (a) { return a.indexOf('--night=') === 0; })[0];
+var nightEnabled = nightArg ? Number(nightArg.split('=')[1]) !== 0 : false;
 
 var server = http.createServer(function(req, res) {
   var html = fs.readFileSync(SETTINGS_HTML, 'utf8'); // re-read each request so edits show on refresh
-  html = html.replace('/*INIT*/', 'var REDRAW_MODE=' + redrawMode + ';');
+  var night = JSON.stringify({ enabled: nightEnabled, start: 22, end: 7 });
+  html = html.replace('/*INIT*/', 'var REDRAW_MODE=' + redrawMode + ';var NIGHT=' + night + ';');
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(html);
 });

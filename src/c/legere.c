@@ -33,6 +33,33 @@ static int s_passive_min = 0;
 static bool s_every_minute = false;
 #define PERSIST_KEY_REDRAW_MODE 195
 
+// User setting (phone settings page): dims the face to a low-luminance red
+// during a wall-clock hour window, to cut blue/white light hitting the eyes
+// at night (red wavelengths suppress melatonin least). Off by default —
+// nothing changes unless the user opts in.
+static bool s_night_enabled = false;
+static int s_night_start = 22;  // hour, 0-23, inclusive
+static int s_night_end = 7;     // hour, 0-23, exclusive; start > end wraps midnight
+#define PERSIST_KEY_NIGHT_ENABLED 196
+#define PERSIST_KEY_NIGHT_START 197
+#define PERSIST_KEY_NIGHT_END 198
+
+// Dim red/amber ink, used in place of the white/gray palette during the
+// night window. Bumped one step up Pebble's quantized red ramp from the
+// original DarkCandyAppleRed/BulgarianRose pair — that was too dark to read
+// comfortably.
+#define NIGHT_INK GColorRed
+#define NIGHT_INK_DIM GColorDarkCandyAppleRed
+
+static bool prv_is_night(void) {
+  if (!s_night_enabled) return false;
+  time_t now = time(NULL);
+  int h = localtime(&now)->tm_hour;
+  if (s_night_start == s_night_end) return false;  // degenerate window = never
+  if (s_night_start < s_night_end) return h >= s_night_start && h < s_night_end;
+  return h >= s_night_start || h < s_night_end;  // wraps past midnight
+}
+
 // Date line: Quantico Bold. Glyph subset in package.json covers A-Z, digits,
 // space, '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL —
 // Quantico's cmap has no gaps in that set (checked against the full Latin-1
@@ -41,9 +68,10 @@ static GFont s_date_font;
 static bool s_date_font_custom;
 
 // Whole date line is drawn in this one colour (no freshness signal on the date
-// row any more — only the minute static carries that). Hardcoded white: reads
-// cleanly on the unlit transflective LCD without adding a second signal colour.
-#define DATE_COLOR GColorWhite
+// row any more — only the minute static carries that). White reads cleanly on
+// the unlit transflective LCD without adding a second signal colour; swapped
+// for NIGHT_INK during the night window (see prv_is_night).
+static GColor prv_date_color(void) { return prv_is_night() ? NIGHT_INK : GColorWhite; }
 
 // The hour/minute digits are pre-rendered bitmaps (a font can't be rasterised
 // big enough on-watch). One sprite sheet of 10 fixed-width slots, sliced into
@@ -137,6 +165,29 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
       layer_mark_dirty(s_digits_layer);
     }
   }
+
+  // "Night colour" setting: dims the face to red during a hour window.
+  // NightEnabled is a plain flag; NightStart/NightEnd only arrive alongside
+  // it (settings.html always sends all three together), so reading them here
+  // rather than gating on presence keeps this in one block.
+  Tuple *night_enabled_tuple = dict_find(iterator, MESSAGE_KEY_NightEnabled);
+  if (night_enabled_tuple) {
+    s_night_enabled = night_enabled_tuple->value->int32 != 0;
+    persist_write_bool(PERSIST_KEY_NIGHT_ENABLED, s_night_enabled);
+
+    Tuple *start_tuple = dict_find(iterator, MESSAGE_KEY_NightStart);
+    if (start_tuple) {
+      s_night_start = start_tuple->value->int32;
+      persist_write_int(PERSIST_KEY_NIGHT_START, s_night_start);
+    }
+    Tuple *end_tuple = dict_find(iterator, MESSAGE_KEY_NightEnd);
+    if (end_tuple) {
+      s_night_end = end_tuple->value->int32;
+      persist_write_int(PERSIST_KEY_NIGHT_END, s_night_end);
+    }
+    layer_mark_dirty(s_digits_layer);
+    layer_mark_dirty(s_date_layer);
+  }
 }
 
 // One frame of the lock-on ramp: count down and repaint. prv_snow_permille()
@@ -209,17 +260,25 @@ static const uint8_t SNOW[4] = {
   GColorWhiteARGB8, GColorLightGrayARGB8, GColorDarkGrayARGB8, GColorBlackARGB8,
 };
 
-// Overwrite the solid minute-ink pixels inside `r` with random SNOW "snow" — a
-// no-signal look for the passive (floored) minutes. Works at the framebuffer
-// level so it needs no offscreen bitmap: only fully-opaque white pixels (the
-// glyph interiors, drawn white just above) are touched, so the anti-aliased
+// Same spread, red-toned, swapped in during the night window so the "no
+// signal" static reads as dim red instead of white/gray.
+static const uint8_t SNOW_NIGHT[4] = {
+  GColorRedARGB8, GColorDarkCandyAppleRedARGB8,
+  GColorDarkCandyAppleRedARGB8, GColorBlackARGB8,
+};
+
+// Overwrite the solid minute-ink pixels inside `r` with random `snow` "snow" —
+// a no-signal look for the passive (floored) minutes. Works at the framebuffer
+// level so it needs no offscreen bitmap: only fully-opaque `ink` pixels (the
+// glyph interiors, drawn in `ink` just above) are touched, so the anti-aliased
 // glyph edges survive as a clean outline around the noise.
 //
 // `permille` (1..1000) is the fraction of ink pixels replaced this frame; the
-// rest stay clean white. The lock-on ramp steps it down so the digits emerge
+// rest stay clean `ink`. The lock-on ramp steps it down so the digits emerge
 // from the noise. ponytail: two rand() calls per snowed pixel (gate + palette)
 // vs one before — only on the shake path, a one-shot ~320 ms burst, not hot.
-static void prv_staticify(GContext *ctx, GRect r, int permille) {
+static void prv_staticify(GContext *ctx, GRect r, int permille, uint8_t ink,
+                          const uint8_t snow[4]) {
   GBitmap *fb = graphics_capture_frame_buffer(ctx);
   if (!fb) return;
   GRect b = gbitmap_get_bounds(fb);
@@ -231,9 +290,9 @@ static void prv_staticify(GContext *ctx, GRect r, int permille) {
     int x1 = r.origin.x + r.size.w;
     if (x1 > ri.max_x + 1) x1 = ri.max_x + 1;
     for (int x = x0; x < x1; x++) {
-      if (ri.data[x] == GColorWhiteARGB8 &&
+      if (ri.data[x] == ink &&
           (permille >= 1000 || (rand() % 1000) < permille)) {
-        ri.data[x] = SNOW[rand() & 3];
+        ri.data[x] = snow[rand() & 3];
       }
     }
   }
@@ -320,11 +379,15 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   // vertical mid-screen (the widest part of the circle), so it spans the full
   // usable width and the rows keep a normal positive gap.
   //
-  // The minute row is drawn solid white, then (when the reading is passive, or
-  // mid lock-on ramp) prv_staticify() replaces that white ink with snow — all of
-  // it when passive, a shrinking fraction over the ramp. The hour is always
-  // exact, so it stays a solid dark grey and never flickers.
+  // The minute row is drawn solid white (or NIGHT_INK during the night
+  // window), then (when the reading is passive, or mid lock-on ramp)
+  // prv_staticify() replaces that ink with snow — all of it when passive, a
+  // shrinking fraction over the ramp. The hour is always exact, so it stays a
+  // solid dark grey (or dimmer red at night) and never flickers.
   int snow_permille = prv_snow_permille();
+  bool night = prv_is_night();
+  GColor hour_ink = night ? NIGHT_INK_DIM : GColorDarkGray;
+  GColor min_ink = night ? NIGHT_INK : GColorWhite;
   if (s_sheet) {
     int grid_w = s_usable_w;
     int grid_x = s_pad;
@@ -343,12 +406,15 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
       if (row == 1) min_rect = GRect(row_x, y, n * s_slot_w, s_slot_h);
       for (int k = 0; k < n; k++) {
         int idx = row * 2 + (n == 1 ? 1 : k);
-        prv_set_ink(s_digit[dv[idx]], row == 0 ? GColorDarkGray : GColorWhite);
+        prv_set_ink(s_digit[dv[idx]], row == 0 ? hour_ink : min_ink);
         graphics_draw_bitmap_in_rect(ctx, s_digit[dv[idx]],
                                      GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h));
       }
     }
-    if (snow_permille > 0) prv_staticify(ctx, min_rect, snow_permille);
+    if (snow_permille > 0) {
+      prv_staticify(ctx, min_rect, snow_permille, min_ink.argb,
+                    night ? SNOW_NIGHT : SNOW);
+    }
   } else {
     // Resource-load failure only: fall back to plain text.
     char hour_str[4], min_str[4];
@@ -367,8 +433,9 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
 
 // Date row: weekday left, day-of-month centre, month right — three L/C/R strings
 // over one shared box (the font is too wide to force equal thirds and stay
-// legible). Whole row is DATE_COLOR — a constant white, no freshness signal
-// here. The box is layer-relative (y = 0): s_date_layer is framed at s_date_top.
+// legible). Whole row is one colour — white, or NIGHT_INK during the night
+// window — no freshness signal here. The box is layer-relative (y = 0):
+// s_date_layer is framed at s_date_top.
 static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
@@ -382,11 +449,12 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
     s_str_mday = t->tm_mday;
   }
 
+  GColor color = prv_date_color();
   int date_w = PBL_IF_ROUND_ELSE(174, s_usable_w);  // round: narrower than usable so the row clears the arc
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
-  prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, DATE_COLOR);
-  prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, DATE_COLOR);
-  prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, DATE_COLOR);
+  prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, color);
+  prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, color);
+  prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, color);
 }
 
 // Minute of the last passive (schedule-driven) repaint, so a button press in
@@ -468,6 +536,14 @@ static void prv_window_load(Window *window) {
   s_passive_min = prv_floor5(localtime(&now)->tm_min);  // first render, before any tick fires
   s_every_minute = persist_exists(PERSIST_KEY_REDRAW_MODE) &&
                    persist_read_bool(PERSIST_KEY_REDRAW_MODE);
+  s_night_enabled = persist_exists(PERSIST_KEY_NIGHT_ENABLED) &&
+                    persist_read_bool(PERSIST_KEY_NIGHT_ENABLED);
+  if (persist_exists(PERSIST_KEY_NIGHT_START)) {
+    s_night_start = persist_read_int(PERSIST_KEY_NIGHT_START);
+  }
+  if (persist_exists(PERSIST_KEY_NIGHT_END)) {
+    s_night_end = persist_read_int(PERSIST_KEY_NIGHT_END);
+  }
 
   s_pad = PAD;
   s_usable_w = bounds.size.w - 2 * s_pad;

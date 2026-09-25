@@ -14,6 +14,12 @@
   value). Saving navigates to pebblejs://close#<json>, the standard Pebble
   config-page handoff: index.js's 'webviewclosed' listener relays the choice to
   the watch as an AppMessage (MESSAGE_KEY_RedrawMode), which persists it.
+
+  "Night colour" dims the face to a low red during a wall-clock hour window,
+  to cut blue/white light at night. Same handoff pattern: index.js also
+  substitutes `var NIGHT={enabled,start,end}`, and Save sends
+  nightEnabled/nightStart/nightEnd, relayed as MESSAGE_KEY_NightEnabled/
+  NightStart/NightEnd.
 -->
 <html lang="en">
 <head>
@@ -87,6 +93,23 @@
       </div>
     </section>
     <section>
+      <p class="seclabel">Night colour</p>
+      <div class="card">
+        <p>Dim the face to a low red at night &mdash; easier on the eyes and on sleep than white.</p>
+        <label class="radio-row">
+          <input type="checkbox" id="nightEnabled">
+          <span>Dim to red at night</span>
+        </label>
+        <p style="margin-top:12px; display:flex; align-items:center; gap:10px;">
+          <span>From</span>
+          <select id="nightStart"></select>
+          <span>to</span>
+          <select id="nightEnd"></select>
+        </p>
+        <p style="margin-top:12px"><button class="btn" id="saveNight">Save</button></p>
+      </div>
+    </section>
+    <section>
       <p class="seclabel">Feedback</p>
       <div class="card">
         <p>Found a bug or have a suggestion? Open an issue on GitHub <a href="https://github.com/gordonbazeley/legere/issues">here</a>.</p>
@@ -107,8 +130,8 @@
 <script>
   /*INIT*/
   (function () {
-    // index.js replaces the INIT marker with `var REDRAW_MODE=<0|1>`; missing
-    // in a plain static preview, so default to 0.
+    // index.js replaces the INIT marker with `var REDRAW_MODE=<0|1>` and
+    // `var NIGHT=<json>`; missing in a plain static preview, so default.
     var mode = (typeof REDRAW_MODE !== 'undefined') ? REDRAW_MODE : 0;
     var radios = document.getElementsByName('redrawMode');
     for (var i = 0; i < radios.length; i++) {
@@ -124,6 +147,23 @@
       // 'webviewclosed' listener, which relays it to the watch as AppMessage.
       window.location = 'pebblejs://close#' +
         encodeURIComponent(JSON.stringify({ redrawMode: selected }));
+    };
+
+    var night = (typeof NIGHT !== 'undefined') ? NIGHT : { enabled: false, start: 22, end: 7 };
+    var startSel = document.getElementById('nightStart');
+    var endSel = document.getElementById('nightEnd');
+    for (var h = 0; h < 24; h++) {
+      var label = (h < 10 ? '0' : '') + h;
+      startSel.add(new Option(label, h, false, h === night.start));
+      endSel.add(new Option(label, h, false, h === night.end));
+    }
+    document.getElementById('nightEnabled').checked = !!night.enabled;
+    document.getElementById('saveNight').onclick = function () {
+      window.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify({
+        nightEnabled: document.getElementById('nightEnabled').checked ? 1 : 0,
+        nightStart: Number(startSel.value),
+        nightEnd: Number(endSel.value),
+      }));
     };
   }());
 </script>

@@ -22,7 +22,10 @@
       "configurable"
     ],
     "messageKeys": [
-      "RedrawMode"
+      "RedrawMode",
+      "NightEnabled",
+      "NightStart",
+      "NightEnd"
     ],
     "resources": {
       "media": [

@@ -41,8 +41,9 @@
 - Digits and date on disjoint layers (`s_digits_layer` / `s_date_layer`); each
   marked dirty only when its own content changes. Date strings cached, rebuilt
   on `tm_mday` change only.
-- No persist storage on the watch beyond `PERSIST_KEY_REDRAW_MODE` (the Time
-  refresh setting). The diagnostic log — `DayRecord` ring, AppMessage export,
+- No persist storage on the watch beyond `PERSIST_KEY_REDRAW_MODE` (Time
+  refresh) and `PERSIST_KEY_NIGHT_ENABLED`/`_START`/`_END` (Night colour).
+  The diagnostic log — `DayRecord` ring, AppMessage export,
   hourly `APP_LOG` rows — was removed 2026-09-07 (see `decisions.md`); the tick
   handler no longer samples or persists anything.
 - Companion settings page (`src/pkjs/settings.html`, generated string in
@@ -50,9 +51,18 @@
   substitutes the `INIT` marker with the last saved value to pre-select the
   radio; Save closes the page via the standard `pebblejs://close#<json>`
   handoff, `index.js`'s `webviewclosed` listener relays it to the watch as
-  `RedrawMode` and remembers it in `localStorage`), then info + GitHub issues +
+  `RedrawMode` and remembers it in `localStorage`), then "Night colour" (an
+  enable checkbox + 24h start/end hour selects, `00`-`23`; relayed as
+  `NightEnabled`/`NightStart`/`NightEnd`, persisted at
+  `PERSIST_KEY_NIGHT_ENABLED`/`_START`/`_END`), then info + GitHub issues +
   ko-fi link. Preview with `node src/open_config.js` (`--redraw=1` pre-selects
-  the "every minute" radio).
+  the "every minute" radio, `--night=1` pre-checks night colour).
+- Night colour, when enabled and the wall-clock hour falls in the configured
+  window (`prv_is_night`, wraps past midnight), swaps digit/date ink and the
+  minute-static palette from white/gray to red (`GColorRed` /
+  `GColorDarkCandyAppleRed` — one step up Pebble's quantized red ramp from an
+  initial pick that read too dark). Checked every redraw, so the swap happens
+  live at the boundary hour without a settings round-trip.
 - Launcher icon (`resources/images/icon.png`) reads on any launcher background
   (white glyph + black keyline).
 - Builds via `pebble build`; `tools/strip-js-sourcemap.sh` drops the unused
@@ -84,9 +94,9 @@
   overpainted by the minute digit's head (e.g. `22:57`). Intentional; grey/white
   contrast carries it, but it's the main thing to sanity-check on hardware.
 - **`configurable` capability stays** — it backs the settings/ko-fi page.
-  `messageKeys` is now just `RedrawMode`; the watch's AppMessage channel is
-  inbox-only (`app_message_open(..., 0)` — no outbox), it only ever receives
-  the setting from the phone.
+  `messageKeys` is `RedrawMode` plus `NightEnabled`/`NightStart`/`NightEnd`;
+  the watch's AppMessage channel is inbox-only (`app_message_open(..., 0)` —
+  no outbox), it only ever receives settings from the phone.
 - **`prv_measure` uses a fixed 400×300 layout box.** Fine for the short strings
   used, but it is a text-layout call — keep it out of any redraw path (currently
   only `prv_window_load` calls it).
