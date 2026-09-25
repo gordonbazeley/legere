@@ -149,7 +149,7 @@
         encodeURIComponent(JSON.stringify({ redrawMode: selected }));
     };
 
-    var night = (typeof NIGHT !== 'undefined') ? NIGHT : { enabled: false, start: 22, end: 7 };
+    var night = (typeof NIGHT !== 'undefined') ? NIGHT : { enabled: false, start: 21, end: 7 };
     var startSel = document.getElementById('nightStart');
     var endSel = document.getElementById('nightEnd');
     for (var h = 0; h < 24; h++) {

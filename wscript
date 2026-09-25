@@ -3,7 +3,10 @@
 #
 # Feel free to customize this to your needs.
 #
+import glob
 import os.path
+import shutil
+import subprocess
 
 top = '.'
 out = 'build'
@@ -52,3 +55,23 @@ def build(ctx):
                                          'src/pkjs/**/*.json',
                                          'src/common/**/*.js']),
                    js_entry_file='src/pkjs/index.js')
+
+    ctx.add_post_fun(_minify_and_copy_pbw)
+
+
+# Every build: drop the unused JS source map (pebble-tool always bundles it),
+# minify the phone JS in the .pbw, and copy the .pbw to Nextcloud for
+# sideloading (copy skipped on machines without that folder).
+def _minify_and_copy_pbw(ctx):
+    build_dir = ctx.bldnode.abspath()
+    pbw = glob.glob(os.path.join(build_dir, '*.pbw'))[0]
+    js = os.path.join(build_dir, 'pebble-js-app.js')
+    # Map is already gone when the bundle wasn't rebuilt, so ignore failure.
+    subprocess.call(['zip', '-dq', pbw, 'pebble-js-app.js.map'],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.check_call(['npx', '--yes', 'terser', js, '-c', '-m', '-o', js])
+    subprocess.check_call(['zip', '-jq', pbw, js])
+    dest = os.path.expanduser('~/Nextcloud/pbws')
+    if os.path.isdir(dest):
+        shutil.copy(pbw, dest)
+        print('Minified {} and copied to {}'.format(os.path.basename(pbw), dest))

@@ -5,9 +5,7 @@ A Pebble watchapp/watchface written in C using the Pebble SDK.
 ## Building & running
 
 ```sh
-pebble build                          # build for all targetPlatforms
-./tools/strip-js-sourcemap.sh         # optional: drop the unused JS source map (~5.7KB)
-./src/build_store.sh                  # store build: strip map, minify JS, copy to ~/Nextcloud/pbws
+pebble build                          # build for all targetPlatforms (minified; copied to ~/Nextcloud/pbws)
 pebble install --emulator emery       # install on the emery emulator
 pebble install --phone <ip>           # install to a paired phone
 ```
