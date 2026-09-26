@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Settings page saves Time refresh and Night colour together with one button.
 - Time refresh now defaults to every minute for new settings-page users.
 - During Night colour, hour digits have a 3px red outline while minute digits
   stay filled red, making the rows easier to distinguish.

@@ -89,7 +89,6 @@
           <input type="radio" name="redrawMode" value="0">
           <span>Every 5 minutes &mdash; shake to reveal the exact minute</span>
         </label>
-        <p style="margin-top:12px"><button class="btn" id="saveRedrawMode">Save</button></p>
       </div>
     </section>
     <section>
@@ -106,9 +105,9 @@
           <span>to</span>
           <select id="nightEnd"></select>
         </p>
-        <p style="margin-top:12px"><button class="btn" id="saveNight">Save</button></p>
       </div>
     </section>
+    <p style="margin:0"><button class="btn" id="saveSettings">Save</button></p>
     <section>
       <p class="seclabel">Feedback</p>
       <div class="card">
@@ -137,7 +136,7 @@
     for (var i = 0; i < radios.length; i++) {
       radios[i].checked = (Number(radios[i].value) === mode);
     }
-    document.getElementById('saveRedrawMode').onclick = function () {
+    document.getElementById('saveSettings').onclick = function () {
       var selected = 0;
       for (var i = 0; i < radios.length; i++) {
         if (radios[i].checked) selected = Number(radios[i].value);
@@ -145,8 +144,12 @@
       // Standard Pebble config-page handoff: navigating to pebblejs://close#
       // closes this webview and delivers the payload to index.js's
       // 'webviewclosed' listener, which relays it to the watch as AppMessage.
-      window.location = 'pebblejs://close#' +
-        encodeURIComponent(JSON.stringify({ redrawMode: selected }));
+      window.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify({
+        redrawMode: selected,
+        nightEnabled: document.getElementById('nightEnabled').checked ? 1 : 0,
+        nightStart: Number(startSel.value),
+        nightEnd: Number(endSel.value),
+      }));
     };
 
     var night = (typeof NIGHT !== 'undefined') ? NIGHT : { enabled: false, start: 21, end: 7 };
@@ -158,13 +161,6 @@
       endSel.add(new Option(label, h, false, h === night.end));
     }
     document.getElementById('nightEnabled').checked = !!night.enabled;
-    document.getElementById('saveNight').onclick = function () {
-      window.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify({
-        nightEnabled: document.getElementById('nightEnabled').checked ? 1 : 0,
-        nightStart: Number(startSel.value),
-        nightEnd: Number(endSel.value),
-      }));
-    };
   }());
 </script>
 </body>

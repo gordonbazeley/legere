@@ -13,9 +13,9 @@ see `decisions.md` → "The 5-minute grid is an identity choice, not a power
 optimisation"). It is a low-*fuss* face that also happens to do nothing
 wasteful.
 
-Single-file watch app. The phone companion is a settings page (info + ko-fi
-link) with one real setting — "Time refresh" (`s_every_minute`, persisted;
-see `decisions.md`).
+Single-file watch app. The phone companion is a settings page with "Time
+refresh" and "Night colour" controls, saved together with one Save button,
+plus info + ko-fi link. Both settings persist on the watch; see `decisions.md`.
 
 ```
 tick (every minute, from the OS)

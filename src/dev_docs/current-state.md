@@ -50,8 +50,9 @@
   `settings-html.js`): "Time refresh" (the setting above — `index.js`
   substitutes the `INIT` marker with the last saved value to pre-select the
   radio; Save closes the page via the standard `pebblejs://close#<json>`
-  handoff, `index.js`'s `webviewclosed` listener relays it to the watch as
-  `RedrawMode` and remembers it in `localStorage`), then "Night colour" (an
+  handoff with both settings in one payload; `index.js`'s `webviewclosed`
+  listener relays both to the watch and remembers them in `localStorage`),
+  then "Night colour" (an
   enable checkbox + 24h start/end hour selects, `00`-`23`; relayed as
   `NightEnabled`/`NightStart`/`NightEnd`, persisted at
   `PERSIST_KEY_NIGHT_ENABLED`/`_START`/`_END`), then info + GitHub issues +
@@ -133,8 +134,8 @@
 | `src/c/legere.c` | Entire watch app (~575 lines) |
 | `CHANGELOG.md` | User-facing changelog — `## Unreleased` plus dated sections |
 | `.github/workflows/build-pbw.yml` | CI: builds the `.pbw` on every push to `main`, publishes it to Actions artifacts and the `pbw-latest` branch |
-| `src/pkjs/index.js` | Phone companion: opens the settings page on `showConfiguration`, relays the Time refresh setting to the watch |
-| `src/pkjs/settings.html` | Companion settings page — Time refresh setting, then info + GitHub issues + ko-fi link (editable source) |
+| `src/pkjs/index.js` | Phone companion: opens the settings page on `showConfiguration`, relays both settings to the watch |
+| `src/pkjs/settings.html` | Companion settings page — Time refresh and Night colour controls with one Save button, then info + GitHub issues + ko-fi link (editable source) |
 | `src/pkjs/settings-html.js` | Generated CommonJS string of `settings.html`, loaded by pkjs — regen after editing the HTML |
 | `src/open_config.js` | Dev helper: serves `settings.html` on localhost for browser preview (`--redraw=1` pre-selects the "every minute" radio) |
 | `package.json` | Pebble metadata, message keys, resources |
