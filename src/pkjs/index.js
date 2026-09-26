@@ -12,9 +12,9 @@
 
 function currentRedrawMode() {
   try {
-    return localStorage.getItem('redrawMode') === '1' ? 1 : 0;
+    return localStorage.getItem('redrawMode') === '0' ? 0 : 1;
   } catch (e) {
-    return 0;
+    return 1;
   }
 }
 

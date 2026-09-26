@@ -82,12 +82,12 @@
       <div class="card">
         <p>How the minute updates while you're wearing it.</p>
         <label class="radio-row">
-          <input type="radio" name="redrawMode" value="0" checked>
-          <span>Every 5 minutes &mdash; shake to reveal the exact minute</span>
+          <input type="radio" name="redrawMode" value="1" checked>
+          <span>Every minute &mdash; always exact, no shake needed</span>
         </label>
         <label class="radio-row">
-          <input type="radio" name="redrawMode" value="1">
-          <span>Every minute &mdash; always exact, no shake needed</span>
+          <input type="radio" name="redrawMode" value="0">
+          <span>Every 5 minutes &mdash; shake to reveal the exact minute</span>
         </label>
         <p style="margin-top:12px"><button class="btn" id="saveRedrawMode">Save</button></p>
       </div>
@@ -132,7 +132,7 @@
   (function () {
     // index.js replaces the INIT marker with `var REDRAW_MODE=<0|1>` and
     // `var NIGHT=<json>`; missing in a plain static preview, so default.
-    var mode = (typeof REDRAW_MODE !== 'undefined') ? REDRAW_MODE : 0;
+    var mode = (typeof REDRAW_MODE !== 'undefined') ? REDRAW_MODE : 1;
     var radios = document.getElementsByName('redrawMode');
     for (var i = 0; i < radios.length; i++) {
       radios[i].checked = (Number(radios[i].value) === mode);

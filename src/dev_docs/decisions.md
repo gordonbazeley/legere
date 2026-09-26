@@ -77,7 +77,8 @@ passive / red exact). Dropped: it's a tiny corner cue a stranger won't decode,
 and the static already says it unmistakably — "this signal isn't locked in"
 reads instantly, and the shake→lock-on gives the interaction a satisfying
 payoff. An earlier plan (grey minutes → white minutes) was too subtle glancing
-at the face in isolation. The hour is genuinely always exact, so it stays solid.
+at the face in isolation. The hour is genuinely always exact, so it stays
+solid by day (and becomes a hollow red outline at night).
 Colouring the whole date row (not just white text) also just reads better on
 the unlit transflective LCD, where the old white day-of-month was faint. The
 whole-row tint itself later went from a mid blue (`GColorVividCerulean`) to
@@ -234,7 +235,7 @@ things, not a reversal of the general "no config UI" stance.
 **Chose:** A real setting on the phone settings page — `MESSAGE_KEY_RedrawMode`
 (int, persisted at `PERSIST_KEY_REDRAW_MODE` via `persist_write_bool` /
 `s_every_minute`) — toggling between the existing 5-minute-grid-plus-shake
-behaviour (default) and a plain every-minute mode: the minute is always shown
+behaviour and a plain every-minute mode (default): the minute is always shown
 exact, redrawn every tick, no static and no shake needed at all
 (`prv_snow_permille()` returns 0 outright when `s_every_minute`; `disp_min` in
 `prv_digits_update_proc` takes the exact branch either way; `prv_tick_handler`

@@ -4,7 +4,7 @@
 // is awkward to iterate on. This just serves the file over http://127.0.0.1
 // and opens it in the default browser.
 //
-//   node src/open_config.js               # radio pre-selected to "every 5 minutes"
+//   node src/open_config.js               # radio pre-selected to "every minute"
 //   node src/open_config.js --redraw=1    # radio pre-selected to "every minute"
 //   node src/open_config.js --night=1     # night colour checkbox pre-checked
 
@@ -20,7 +20,7 @@ if (!fs.existsSync(SETTINGS_HTML)) {
 }
 
 var redrawArg = process.argv.filter(function (a) { return a.indexOf('--redraw=') === 0; })[0];
-var redrawMode = redrawArg ? Number(redrawArg.split('=')[1]) : 0;
+var redrawMode = redrawArg ? Number(redrawArg.split('=')[1]) : 1;
 var nightArg = process.argv.filter(function (a) { return a.indexOf('--night=') === 0; })[0];
 var nightEnabled = nightArg ? Number(nightArg.split('=')[1]) !== 0 : false;
 

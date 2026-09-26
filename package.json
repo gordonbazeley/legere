@@ -43,8 +43,20 @@
         },
         {
           "type": "bitmap",
+          "name": "IMAGE_DIGITS_OUTLINE",
+          "file": "images/digits_outline.png",
+          "targetPlatforms": ["gabbro"]
+        },
+        {
+          "type": "bitmap",
           "name": "IMAGE_DIGITS_LG",
           "file": "images/digits_lg.png",
+          "targetPlatforms": ["emery"]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_DIGITS_LG_OUTLINE",
+          "file": "images/digits_lg_outline.png",
           "targetPlatforms": ["emery"]
         },
         {

@@ -2,11 +2,14 @@
 
 ## Unreleased
 
+- Time refresh now defaults to every minute for new settings-page users.
+- During Night colour, hour digits have a 3px red outline while minute digits
+  stay filled red, making the rows easier to distinguish.
 - Added a "Night colour" setting on the phone settings page: dims the face
   to red (digits, date, and the minute static) during a user-set 24-hour
   window, to cut blue/white light at night. Off by default.
-- Added a "Time refresh" setting on the phone settings page: the default
-  5-minute-grid-plus-shake behavior, or a plain every-minute mode with no
+- Added a "Time refresh" setting on the phone settings page: a 5-minute-grid-
+  plus-shake behavior, or the default plain every-minute mode with no
   static and no shake needed (minute is always exact).
 - Removed the diagnostic shake-log instrumentation: the on-watch `DayRecord`
   persist ring, the settings-page CSV export and "Diagnostic log" section,

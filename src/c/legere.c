@@ -5,6 +5,7 @@
 #include <string.h>
 
 static Window *s_window;
+static void prv_set_tap_service(bool enabled);
 // Two disjoint sibling layers so a repaint of one never re-runs the other's
 // update proc: the time digits change on every passive/forced repaint, the date
 // row only on a date rollover.
@@ -30,7 +31,8 @@ static int s_passive_min = 0;
 // exact, redrawn every minute. Stopgap for platforms without a shake gesture
 // worth the friction; the plan is to remove this once touch is enabled for
 // watchapps (see decisions.md) and drop back to a single behaviour.
-static bool s_every_minute = false;
+static bool s_every_minute = true;
+static bool s_tap_service_active = false;
 #define PERSIST_KEY_REDRAW_MODE 195
 
 // User setting (phone settings page): dims the face to a low-luminance red
@@ -51,13 +53,11 @@ static int s_night_end = 7;     // hour, 0-23, exclusive; start > end wraps midn
 #define NIGHT_INK GColorRed
 #define NIGHT_INK_DIM GColorDarkCandyAppleRed
 
-static bool prv_is_night(void) {
+static bool prv_is_night(int hour) {
   if (!s_night_enabled) return false;
-  time_t now = time(NULL);
-  int h = localtime(&now)->tm_hour;
   if (s_night_start == s_night_end) return false;  // degenerate window = never
-  if (s_night_start < s_night_end) return h >= s_night_start && h < s_night_end;
-  return h >= s_night_start || h < s_night_end;  // wraps past midnight
+  if (s_night_start < s_night_end) return hour >= s_night_start && hour < s_night_end;
+  return hour >= s_night_start || hour < s_night_end;  // wraps past midnight
 }
 
 // Date line: Quantico Bold. Glyph subset in package.json covers A-Z, digits,
@@ -71,15 +71,19 @@ static bool s_date_font_custom;
 // row any more — only the minute static carries that). White reads cleanly on
 // the unlit transflective LCD without adding a second signal colour; swapped
 // for NIGHT_INK during the night window (see prv_is_night).
-static GColor prv_date_color(void) { return prv_is_night() ? NIGHT_INK : GColorWhite; }
+static GColor prv_date_color(int hour) { return prv_is_night(hour) ? NIGHT_INK : GColorWhite; }
 
 // The hour/minute digits are pre-rendered bitmaps (a font can't be rasterised
 // big enough on-watch). One sprite sheet of 10 fixed-width slots, sliced into
 // per-digit sub-bitmaps at load. See tools/gen-digits.sh.
 static GBitmap *s_sheet;
 static GBitmap *s_digit[10];
+static GBitmap *s_outline_sheet;
+static GBitmap *s_outline_digit[10];
 static int s_slot_w;
 static int s_slot_h;
+static int s_outline_slot_w;
+static int s_outline_slot_h;
 
 // What the last repaint actually put on screen, so a refresh that would change
 // nothing can skip the redraw entirely.
@@ -156,6 +160,14 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
     if (new_every_minute != s_every_minute) {
       s_every_minute = new_every_minute;
       persist_write_bool(PERSIST_KEY_REDRAW_MODE, s_every_minute);
+      prv_set_tap_service(!s_every_minute);
+      if (s_every_minute && s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
+      if (s_every_minute) {
+        s_shimmer_timer = NULL;
+        s_shimmer_left = 0;
+        s_shimmer_out = false;
+        s_exact = false;
+      }
       // Re-sync so the change is visible immediately rather than waiting for
       // the next scheduled tick - falling back to 5-minute mode re-floors to
       // the grid, matching what the next real tick would have set anyway.
@@ -211,6 +223,7 @@ static int s_exact_min = -1;
 
 // Refresh the minute row to the exact time unless it's already on screen.
 static void prv_refresh_to_exact(void) {
+  if (s_every_minute) return;
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   if (s_exact && !s_shimmer_out &&
@@ -229,7 +242,7 @@ static void prv_refresh_to_exact(void) {
 
 // Recolour a digit by poking the sheet's palette — tint every visible palette
 // entry to `c`. No second bitmap; sub-bitmaps share the parent's palette, so
-// call this immediately before each blit.
+// call this once before drawing a row of the same colour.
 static void prv_set_ink(GBitmap *b, GColor c) {
   int n;
   switch (gbitmap_get_format(b)) {
@@ -383,10 +396,11 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   // window), then (when the reading is passive, or mid lock-on ramp)
   // prv_staticify() replaces that ink with snow — all of it when passive, a
   // shrinking fraction over the ramp. The hour is always exact, so it stays a
-  // solid dark grey (or dimmer red at night) and never flickers.
+  // solid dark grey by day; at night its pre-rendered hollow red outline stays
+  // distinct from the filled minute digits and never flickers.
   int snow_permille = prv_snow_permille();
-  bool night = prv_is_night();
-  GColor hour_ink = night ? NIGHT_INK_DIM : GColorDarkGray;
+  bool night = prv_is_night(t->tm_hour);
+  GColor hour_ink = night ? NIGHT_INK : GColorDarkGray;
   GColor min_ink = night ? NIGHT_INK : GColorWhite;
   if (s_sheet) {
     int grid_w = s_usable_w;
@@ -404,11 +418,19 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
       int row_x = grid_x + (grid_w - n * s_slot_w) / 2;
       int y = block_top + row * (s_slot_h + DIGIT_GAP);
       if (row == 1) min_rect = GRect(row_x, y, n * s_slot_w, s_slot_h);
+      bool outline_hour = night && row == 0 && s_outline_sheet;
+      prv_set_ink(outline_hour ? s_outline_digit[0] : s_digit[0],
+                  row == 0 ? hour_ink : min_ink);
       for (int k = 0; k < n; k++) {
         int idx = row * 2 + (n == 1 ? 1 : k);
-        prv_set_ink(s_digit[dv[idx]], row == 0 ? hour_ink : min_ink);
-        graphics_draw_bitmap_in_rect(ctx, s_digit[dv[idx]],
-                                     GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h));
+        GRect digit_rect = GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h);
+        if (outline_hour) {
+          graphics_draw_bitmap_in_rect(ctx, s_outline_digit[dv[idx]],
+              GRect(digit_rect.origin.x - 3, digit_rect.origin.y - 3,
+                    s_outline_slot_w, s_outline_slot_h));
+        } else {
+          graphics_draw_bitmap_in_rect(ctx, s_digit[dv[idx]], digit_rect);
+        }
       }
     }
     if (snow_permille > 0) {
@@ -449,7 +471,7 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
     s_str_mday = t->tm_mday;
   }
 
-  GColor color = prv_date_color();
+  GColor color = prv_date_color(t->tm_hour);
   int date_w = PBL_IF_ROUND_ELSE(174, s_usable_w);  // round: narrower than usable so the row clears the arc
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
   prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, color);
@@ -527,6 +549,13 @@ static void prv_tap_handler(AccelAxisType axis, int32_t direction) {
   prv_refresh_to_exact();
 }
 
+static void prv_set_tap_service(bool enabled) {
+  if (enabled == s_tap_service_active) return;
+  if (enabled) accel_tap_service_subscribe(prv_tap_handler);
+  else accel_tap_service_unsubscribe();
+  s_tap_service_active = enabled;
+}
+
 static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
@@ -534,7 +563,7 @@ static void prv_window_load(Window *window) {
 
   time_t now = time(NULL);
   s_passive_min = prv_floor5(localtime(&now)->tm_min);  // first render, before any tick fires
-  s_every_minute = persist_exists(PERSIST_KEY_REDRAW_MODE) &&
+  s_every_minute = !persist_exists(PERSIST_KEY_REDRAW_MODE) ||
                    persist_read_bool(PERSIST_KEY_REDRAW_MODE);
   s_night_enabled = persist_exists(PERSIST_KEY_NIGHT_ENABLED) &&
                     persist_read_bool(PERSIST_KEY_NIGHT_ENABLED);
@@ -565,8 +594,10 @@ static void prv_window_load(Window *window) {
 
 #if defined(PBL_PLATFORM_EMERY)
   s_sheet = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DIGITS_LG);   // 200x228 rect
+  s_outline_sheet = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DIGITS_LG_OUTLINE);
 #else
   s_sheet = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DIGITS);      // gabbro, 180 round
+  s_outline_sheet = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DIGITS_OUTLINE);
 #endif
   if (s_sheet) {
     GSize ss = gbitmap_get_bounds(s_sheet).size;
@@ -575,6 +606,15 @@ static void prv_window_load(Window *window) {
     for (int i = 0; i < 10; i++) {
       s_digit[i] = gbitmap_create_as_sub_bitmap(
           s_sheet, GRect(i * s_slot_w, 0, s_slot_w, s_slot_h));
+    }
+  }
+  if (s_outline_sheet) {
+    GSize ss = gbitmap_get_bounds(s_outline_sheet).size;
+    s_outline_slot_w = ss.w / 10;
+    s_outline_slot_h = ss.h;
+    for (int i = 0; i < 10; i++) {
+      s_outline_digit[i] = gbitmap_create_as_sub_bitmap(
+          s_outline_sheet, GRect(i * s_outline_slot_w, 0, s_outline_slot_w, s_outline_slot_h));
     }
   }
 
@@ -607,8 +647,10 @@ static void prv_window_unload(Window *window) {
   layer_destroy(s_date_layer);
   for (int i = 0; i < 10; i++) {
     if (s_digit[i]) gbitmap_destroy(s_digit[i]);
+    if (s_outline_digit[i]) gbitmap_destroy(s_outline_digit[i]);
   }
   if (s_sheet) gbitmap_destroy(s_sheet);
+  if (s_outline_sheet) gbitmap_destroy(s_outline_sheet);
   if (s_date_font_custom) fonts_unload_custom_font(s_date_font);
 }
 
@@ -628,7 +670,7 @@ static void prv_init(void) {
 
   tick_timer_service_subscribe(MINUTE_UNIT, prv_tick_handler);
   backlight_service_subscribe(prv_backlight_handler);
-  accel_tap_service_subscribe(prv_tap_handler);
+  prv_set_tap_service(!s_every_minute);
 
   // Inbox only — the phone settings page pushes MESSAGE_KEY_RedrawMode; the
   // watch never sends anything back, so the outbox is 0.
@@ -638,7 +680,7 @@ static void prv_init(void) {
 
 static void prv_deinit(void) {
   app_message_deregister_callbacks();
-  accel_tap_service_unsubscribe();
+  prv_set_tap_service(false);
   backlight_service_unsubscribe();
   tick_timer_service_unsubscribe();
   window_destroy(s_window);

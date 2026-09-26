@@ -27,7 +27,7 @@ shake / tap  ──┐
 backlight on ──┼── force an exact repaint (s_exact = true), unless nothing would change
                │
         prv_digits_update_proc  (s_digits_layer)
-          ├── hour digits  (bitmap blits, GColorDarkGray, always)
+          ├── hour digits  (bitmap blits: dark grey by day, 3px hollow red asset at night)
           └── minute digits(white, then prv_staticify() snows a fraction: all when
           │                 passive, ramping to none over the lock-on / back to all on lock-out)
         prv_date_update_proc    (s_date_layer — only marked dirty on a date rollover)
@@ -40,7 +40,8 @@ backlight on ──┼── force an exact repaint (s_exact = true), unless not
 
 A font can't be rasterised large enough on-watch (per-glyph cache limit), so the
 digits ship as a **sprite sheet**: one PNG of 10 fixed-width slots, sliced into
-`s_digit[0..9]` sub-bitmaps at load. `tools/gen-digits.sh` regenerates the
+`s_digit[0..9]` sub-bitmaps at load. Night mode uses a matching pre-rendered
+3px-outline sheet, avoiding repeated offset blits. `tools/gen-digits.sh` regenerates the
 sheets from `resources/fonts/AlfaSlabOne-Regular.ttf` (see that script's header
 for the full pipeline — shared-baseline crop, counter-hole punching, alpha
 quantisation, per-digit right-alignment).

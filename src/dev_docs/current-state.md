@@ -12,9 +12,9 @@
   stagger). Within each row the two digits are flush-right in their fixed-width
   slots (baked into the sprite sheet by `tools/gen-digits.sh`, `-gravity
   SouthEast`), so all four digits align on a consistent right edge.
-- Passive 5-minute repaint grid, Quiet Time or not (no hourly fallback) — or
-  a plain every-minute mode with no static/shake at all, if the user has
-  picked that in the "Time refresh" setting (`s_every_minute`,
+- Plain every-minute mode with no static/shake by default, or a passive
+  5-minute repaint grid (Quiet Time or not, no hourly fallback) if the user
+  picks that in the "Time refresh" setting (`s_every_minute`,
   `MESSAGE_KEY_RedrawMode`, persisted). See `decisions.md`.
 - Wrist shake / tap (daylight) and backlight-on (dark) force an exact-minute
   repaint; `prv_refresh_to_exact` no-ops if the exact time is already shown.
@@ -58,8 +58,9 @@
   ko-fi link. Preview with `node src/open_config.js` (`--redraw=1` pre-selects
   the "every minute" radio, `--night=1` pre-checks night colour).
 - Night colour, when enabled and the wall-clock hour falls in the configured
-  window (`prv_is_night`, wraps past midnight), swaps digit/date ink and the
-  minute-static palette from white/gray to red (`GColorRed` /
+  window (`prv_is_night`, wraps past midnight), draws 3px hollow red hour digits
+  from a pre-rendered sprite sheet,
+  with filled red minute/date ink and minute-static palette (`GColorRed` /
   `GColorDarkCandyAppleRed` — one step up Pebble's quantized red ramp from an
   initial pick that read too dark). Checked every redraw, so the swap happens
   live at the boundary hour without a settings round-trip.
@@ -141,7 +142,9 @@
 | `resources/fonts/AlfaSlabOne-Regular.ttf` | Source for the digit sprite sheets |
 | `resources/fonts/Quantico-Bold.ttf` | Date row font (`FONT_DATE_16` on gabbro; `FONT_DATE_24` or `_20` on emery, picked at load) |
 | `resources/images/digits.png` | gabbro sprite sheet — slot 73×80 |
+| `resources/images/digits_outline.png` | gabbro 3px hour-outline sprite sheet — slot 79×86 |
 | `resources/images/digits_lg.png` | emery sprite sheet — slot 93×103 |
+| `resources/images/digits_lg_outline.png` | emery 3px hour-outline sprite sheet — slot 99×109 |
 | `resources/images/icon.png` | Launcher icon, 25×25, white glyph + black keyline |
 | `tools/gen-digits.sh` | Regenerates the sprite sheets from the TTF |
 | `tools/punch-holes.py` | Grows enclosed counters without touching the outer silhouette |
