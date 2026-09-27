@@ -4,7 +4,7 @@
 
 - Settings page saves Time refresh and Night colour together with one button.
 - Time refresh now defaults to every minute for new settings-page users.
-- During Night colour, hour digits have a 3px red outline while minute digits
+- During Night colour, minute digits have a 4px red outline while hour digits
   stay filled red, making the rows easier to distinguish.
 - Added a "Night colour" setting on the phone settings page: dims the face
   to red (digits, date, and the minute static) during a user-set 24-hour

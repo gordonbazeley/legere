@@ -67,12 +67,6 @@ static bool prv_is_night(int hour) {
 static GFont s_date_font;
 static bool s_date_font_custom;
 
-// Whole date line is drawn in this one colour (no freshness signal on the date
-// row any more — only the minute static carries that). White reads cleanly on
-// the unlit transflective LCD without adding a second signal colour; swapped
-// for NIGHT_INK during the night window (see prv_is_night).
-static GColor prv_date_color(int hour) { return prv_is_night(hour) ? NIGHT_INK : GColorWhite; }
-
 // The hour/minute digits are pre-rendered bitmaps (a font can't be rasterised
 // big enough on-watch). One sprite sheet of 10 fixed-width slots, sliced into
 // per-digit sub-bitmaps at load. See tools/gen-digits.sh.
@@ -273,13 +267,6 @@ static const uint8_t SNOW[4] = {
   GColorWhiteARGB8, GColorLightGrayARGB8, GColorDarkGrayARGB8, GColorBlackARGB8,
 };
 
-// Same spread, red-toned, swapped in during the night window so the "no
-// signal" static reads as dim red instead of white/gray.
-static const uint8_t SNOW_NIGHT[4] = {
-  GColorRedARGB8, GColorDarkCandyAppleRedARGB8,
-  GColorDarkCandyAppleRedARGB8, GColorBlackARGB8,
-};
-
 // Overwrite the solid minute-ink pixels inside `r` with random `snow` "snow" —
 // a no-signal look for the passive (floored) minutes. Works at the framebuffer
 // level so it needs no offscreen bitmap: only fully-opaque `ink` pixels (the
@@ -392,12 +379,13 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   // vertical mid-screen (the widest part of the circle), so it spans the full
   // usable width and the rows keep a normal positive gap.
   //
-  // The minute row is drawn solid white (or NIGHT_INK during the night
-  // window), then (when the reading is passive, or mid lock-on ramp)
-  // prv_staticify() replaces that ink with snow — all of it when passive, a
-  // shrinking fraction over the ramp. The hour is always exact, so it stays a
-  // solid dark grey by day; at night its pre-rendered hollow red outline stays
-  // distinct from the filled minute digits and never flickers.
+  // By day the minute row is drawn solid white, then (when the reading is
+  // passive, or mid lock-on ramp) prv_staticify() replaces that ink with
+  // snow — all of it when passive, a shrinking fraction over the ramp. At
+  // night the minute row switches to a pre-rendered hollow red outline
+  // instead — there's no solid fill left to snow, so the static effect is
+  // skipped for the night window. The hour is always exact and never
+  // flickers, so it stays solid (dark grey by day, red at night) either way.
   int snow_permille = prv_snow_permille();
   bool night = prv_is_night(t->tm_hour);
   GColor hour_ink = night ? NIGHT_INK : GColorDarkGray;
@@ -418,24 +406,23 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
       int row_x = grid_x + (grid_w - n * s_slot_w) / 2;
       int y = block_top + row * (s_slot_h + DIGIT_GAP);
       if (row == 1) min_rect = GRect(row_x, y, n * s_slot_w, s_slot_h);
-      bool outline_hour = night && row == 0 && s_outline_sheet;
-      prv_set_ink(outline_hour ? s_outline_digit[0] : s_digit[0],
+      bool outline_min = night && row == 1 && s_outline_sheet;
+      prv_set_ink(outline_min ? s_outline_digit[0] : s_digit[0],
                   row == 0 ? hour_ink : min_ink);
       for (int k = 0; k < n; k++) {
         int idx = row * 2 + (n == 1 ? 1 : k);
         GRect digit_rect = GRect(row_x + k * s_slot_w, y, s_slot_w, s_slot_h);
-        if (outline_hour) {
+        if (outline_min) {
           graphics_draw_bitmap_in_rect(ctx, s_outline_digit[dv[idx]],
-              GRect(digit_rect.origin.x - 3, digit_rect.origin.y - 3,
+              GRect(digit_rect.origin.x - 4, digit_rect.origin.y - 4,
                     s_outline_slot_w, s_outline_slot_h));
         } else {
           graphics_draw_bitmap_in_rect(ctx, s_digit[dv[idx]], digit_rect);
         }
       }
     }
-    if (snow_permille > 0) {
-      prv_staticify(ctx, min_rect, snow_permille, min_ink.argb,
-                    night ? SNOW_NIGHT : SNOW);
+    if (snow_permille > 0 && !night) {
+      prv_staticify(ctx, min_rect, snow_permille, min_ink.argb, SNOW);
     }
   } else {
     // Resource-load failure only: fall back to plain text.
@@ -452,6 +439,12 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   s_drawn_hour = hour;
   s_drawn_min = disp_min;
 }
+
+// Whole date line is drawn in this one colour (no freshness signal on the date
+// row any more — only the minute static carries that). White reads cleanly on
+// the unlit transflective LCD without adding a second signal colour; swapped
+// for NIGHT_INK during the night window (see prv_is_night).
+static GColor prv_date_color(int hour) { return prv_is_night(hour) ? NIGHT_INK : GColorWhite; }
 
 // Date row: weekday left, day-of-month centre, month right — three L/C/R strings
 // over one shared box (the font is too wide to force equal thirds and stay

@@ -120,7 +120,7 @@ PYEOF
   # One row of 10 slots: white ink, hard-edged alpha (see threshold above).
   magick "$tmp"/p{0,1,2,3,4,5,6,7,8,9}.png +append -background none \
     -strip PNG32:"$OUT_DIR/$name.png"
-  # A 3px hollow version for Night colour. Each slot is wider by 6px, letting
+  # A 4px hollow version for Night colour. Each slot is wider by 8px, letting
   # the outline extend beyond the normal glyph bounds without changing layout.
   python3 - "$tmp" "$slot_w" "$slot_h" <<'PYEOF'
 import sys
@@ -128,9 +128,9 @@ from PIL import Image, ImageChops, ImageFilter
 tmp, width, height = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 for digit in range(10):
     src = Image.open(f"{tmp}/p{digit}.png").convert("RGBA")
-    alpha = Image.new("L", (width + 6, height + 6), 0)
-    alpha.paste(src.getchannel("A"), (3, 3))
-    edge = ImageChops.subtract(alpha.filter(ImageFilter.MaxFilter(7)), alpha)
+    alpha = Image.new("L", (width + 8, height + 8), 0)
+    alpha.paste(src.getchannel("A"), (4, 4))
+    edge = ImageChops.subtract(alpha.filter(ImageFilter.MaxFilter(9)), alpha)
     out = Image.new("RGBA", alpha.size, (255, 255, 255, 0))
     out.putalpha(edge)
     out.save(f"{tmp}/o{digit}.png")
