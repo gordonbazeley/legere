@@ -31,6 +31,17 @@ wscript          Build rules — usually no need to edit
 By default this project is configured as a watchapp. To make it a watchface,
 set `pebble.watchapp.watchface` to `true` in `package.json`.
 
+## Night colour
+
+By day, minutes are the prominent digits (solid, larger visual weight) and
+hours are secondary — the question during the day is "am I running late?",
+which needs the exact minute.
+
+At night, this flips: hours become the prominent (solid) digits and minutes
+recede to a hollow outline. The question on waking at night is "should I go
+back to sleep?", which only needs a rough sense of the hour, not the exact
+minute.
+
 ## Documentation
 
 Full SDK docs, tutorials, and API reference: <https://developer.repebble.com>
