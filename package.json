@@ -81,5 +81,8 @@
         }
       ]
     }
+  },
+  "devDependencies": {
+    "terser": "5.51.2"
   }
 }

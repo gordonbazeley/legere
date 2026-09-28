@@ -1,5 +1,6 @@
 # Pebble build output
 build/
+node_modules/
 
 # waf lock
 .lock-waf_*
@@ -8,3 +9,6 @@ build/
 compile_commands.json
 .clangd
 .cache/
+
+# Generated from src/pkjs/settings.html during pebble build.
+src/pkjs/settings-html.js

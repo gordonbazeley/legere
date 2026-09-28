@@ -24,7 +24,7 @@ setting persists on the watch; see `decisions.md`.
 tick (every minute, from the OS)
   └── mark dirty, repaint
         prv_digits_update_proc  (s_digits_layer)
-          ├── hour digits  (bitmap blits: dark grey by day, 3px hollow red asset at night)
+          ├── hour digits  (dark grey by day, solid red at night)
           └── minute digits (white by day, hollow red outline at night)
         prv_date_update_proc    (s_date_layer — only marked dirty on a date rollover)
           └── date row     (weekday / day / month; whole row a constant white)

@@ -107,10 +107,8 @@ is the grill session captured in `decisions.md`.
 ## Store v1
 
 - [x] **ko-fi link in the settings page.** Done — `src/pkjs/settings.html`
-  (editable source) + generated `settings-html.js` wrapper + `src/open_config.js`
-  dev helper, same pattern as `~/src/tidepebble`. Page: Time refresh setting,
-  then tagline, GitHub issues link, ko-fi button. `showConfiguration` opens it
-  as a data: URI.
+  is the editable source; `wscript` generates the ignored runtime wrapper.
+  The page has Night colour, GitHub issues, and the ko-fi button.
 - [ ] **Listing pass.** Store assets (icon sizes, banner, screenshots),
   description copy. Pull the battery guidance from `architecture.md` → "Battery
   guidance (for the store listing)" into the description.

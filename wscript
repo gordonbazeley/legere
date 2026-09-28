@@ -67,7 +67,7 @@ def build(ctx):
 # here on every build means the two files can never drift out of sync.
 def _generate_settings_html_js(ctx):
     src = ctx.path.find_node('src/pkjs/settings.html')
-    html = src.read()
+    html = src.read(encoding='utf-8')
     js = 'module.exports = {};\n'.format(json.dumps(html))
     ctx.path.make_node('src/pkjs/settings-html.js').write(js)
 
@@ -82,7 +82,7 @@ def _minify_and_copy_pbw(ctx):
     # Map is already gone when the bundle wasn't rebuilt, so ignore failure.
     subprocess.call(['zip', '-dq', pbw, 'pebble-js-app.js.map'],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.check_call(['npx', '--yes', 'terser', js, '-c', '-m', '-o', js])
+    subprocess.check_call(['npx', '--no-install', 'terser', js, '-c', '-m', '-o', js])
     subprocess.check_call(['zip', '-jq', pbw, js])
     dest = os.path.expanduser('~/Nextcloud/pbws')
     if os.path.isdir(dest):
