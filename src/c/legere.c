@@ -1,39 +1,14 @@
 #include <pebble.h>
 #include <ctype.h>
 #include <locale.h>
-#include <stdlib.h>
 #include <string.h>
 
 static Window *s_window;
-static void prv_set_tap_service(bool enabled);
 // Two disjoint sibling layers so a repaint of one never re-runs the other's
-// update proc: the time digits change on every passive/forced repaint, the date
+// update proc: the time digits change on every minute tick, the date
 // row only on a date rollover.
 static Layer *s_digits_layer;
 static Layer *s_date_layer;
-
-// true  = a wrist shake forced an exact reading (minute digits clean)
-// false = the minute is floored to a multiple of 5 (passive, minute digits snow)
-static bool s_exact = false;
-
-// Minute shown while passive. Normally kept on the 5-minute grid (Quiet Time
-// or not) by prv_tick_handler's scheduled resync below, but the moment an
-// exact reading expires it's pinned at that real (unfloored) minute instead of
-// jumping back to the grid mark before it — so a shake at :33 that expires at
-// :34 shows a static "34", not a static "30". It re-syncs to the grid at the
-// next scheduled tick either way.
-static int s_passive_min = 0;
-
-// User setting (phone settings page, MESSAGE_KEY_RedrawMode, persisted at
-// PERSIST_KEY_REDRAW_MODE): false = current behaviour (5-minute soft grid,
-// shake/tap/backlight to reveal exact). true = every-minute mode - the
-// static/shake mechanic is bypassed entirely and the minute is always shown
-// exact, redrawn every minute. Stopgap for platforms without a shake gesture
-// worth the friction; the plan is to remove this once touch is enabled for
-// watchapps (see decisions.md) and drop back to a single behaviour.
-static bool s_every_minute = true;
-static bool s_tap_service_active = false;
-#define PERSIST_KEY_REDRAW_MODE 195
 
 // User setting (phone settings page): dims the face to a low-luminance red
 // during a wall-clock hour window, to cut blue/white light hitting the eyes
@@ -52,6 +27,12 @@ static int s_night_end = 7;     // hour, 0-23, exclusive; start > end wraps midn
 // comfortably.
 #define NIGHT_INK GColorRed
 #define NIGHT_INK_DIM GColorDarkCandyAppleRed
+
+static int prv_clamp_hour(int h) {
+  if (h < 0) return 0;
+  if (h > 23) return 23;
+  return h;
+}
 
 static bool prv_is_night(int hour) {
   if (!s_night_enabled) return false;
@@ -79,48 +60,17 @@ static int s_slot_h;
 static int s_outline_slot_w;
 static int s_outline_slot_h;
 
-// What the last repaint actually put on screen, so a refresh that would change
-// nothing can skip the redraw entirely.
-static int s_drawn_hour = -1;
-static int s_drawn_min = -1;
-
-// Passive minutes are drawn as TV-static "snow" (see prv_staticify). A shake
-// resolves them to a clean signal — but first runs a short "locking on" ramp:
-// SHIMMER_FRAMES redraws SHIMMER_MS apart, each snowing a smaller fraction of
-// the minute ink than the last, so the digits surface out of the noise like a
-// tuner pulling a station in. The frame that lands on 0 is the clean render.
-// The same ramp plays in reverse when the clock ticks past the locked minute
-// (s_shimmer_out): the minute decays back into static instead of cutting out.
-// HW-tune this (feel of the lock-on) alongside the values themselves.
-#define SHIMMER_FRAMES 8
-#define SHIMMER_MS 40
-static int s_shimmer_left = 0;         // frames remaining in the ramp (SHIMMER_FRAMES..0)
-static bool s_shimmer_out = false;     // true = ramp running snow-ward (lock lost), false = lock-on
-static AppTimer *s_shimmer_timer = NULL;
-
-// Ceiling on passive snow density, in permille of the minute-ink pixels — dialed
-// back from a full 1000 (every pixel) so the passive face reads as static
-// without being quite so agitated.
-#define PASSIVE_SNOW_PERMILLE 350
-
-// Snow density for the current frame, in permille of the minute-ink pixels:
-// PASSIVE_SNOW_PERMILLE = passive / no signal, 0 = clean. A ramp in flight wins
-// over s_exact: lock-on steps PASSIVE_SNOW_PERMILLE->0, lock-out steps the reverse.
-// Every-minute mode never snows at all - the minute is always exact there.
-static int prv_snow_permille(void) {
-  if (s_every_minute) return 0;
-  if (s_shimmer_left > 0) {
-    int snowed = s_shimmer_out ? SHIMMER_FRAMES - s_shimmer_left : s_shimmer_left;
-    return snowed * PASSIVE_SNOW_PERMILLE / SHIMMER_FRAMES;
-  }
-  return s_exact ? 0 : PASSIVE_SNOW_PERMILLE;
-}
-
 static int s_digit_band_top; // top y of the digit grid
 static int s_date_top;       // y of the date row
 static int s_date_h;
 static int s_pad;
 static int s_usable_w;
+static int s_block_top;      // top y of the digit block, computed once from the above
+
+// Latest wall-clock time, refreshed once per minute by prv_tick_handler.
+// Both update procs read this instead of calling time()/localtime() again on
+// every repaint — a repaint never needs finer than minute resolution anyway.
+static struct tm s_now;
 
 #define PAD PBL_IF_ROUND_ELSE(20, 6)
 // px between the hour and minute rows; negative on emery = the minute row
@@ -133,8 +83,6 @@ static GSize prv_measure(const char *text, GFont font) {
                                                 GTextOverflowModeFill, GTextAlignmentLeft);
 }
 
-static int prv_floor5(int m) { return (m / 5) * 5; }
-
 // Current wall-clock hour, in the 12/24h form the face shows.
 static int prv_display_hour(const struct tm *t) {
   int h = t->tm_hour;
@@ -145,33 +93,7 @@ static int prv_display_hour(const struct tm *t) {
   return h;
 }
 
-// The phone settings page relays the "Time refresh" choice as
-// MESSAGE_KEY_RedrawMode; we persist it and re-sync the face immediately.
 static void prv_inbox_received_handler(DictionaryIterator *iterator, void *context) {
-  Tuple *redraw_tuple = dict_find(iterator, MESSAGE_KEY_RedrawMode);
-  if (redraw_tuple) {
-    bool new_every_minute = redraw_tuple->value->int32 != 0;
-    if (new_every_minute != s_every_minute) {
-      s_every_minute = new_every_minute;
-      persist_write_bool(PERSIST_KEY_REDRAW_MODE, s_every_minute);
-      prv_set_tap_service(!s_every_minute);
-      if (s_every_minute && s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
-      if (s_every_minute) {
-        s_shimmer_timer = NULL;
-        s_shimmer_left = 0;
-        s_shimmer_out = false;
-        s_exact = false;
-      }
-      // Re-sync so the change is visible immediately rather than waiting for
-      // the next scheduled tick - falling back to 5-minute mode re-floors to
-      // the grid, matching what the next real tick would have set anyway.
-      time_t now = time(NULL);
-      struct tm *t = localtime(&now);
-      if (!s_every_minute) s_passive_min = prv_floor5(t->tm_min);
-      layer_mark_dirty(s_digits_layer);
-    }
-  }
-
   // "Night colour" setting: dims the face to red during a hour window.
   // NightEnabled is a plain flag; NightStart/NightEnd only arrive alongside
   // it (settings.html always sends all three together), so reading them here
@@ -183,55 +105,17 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
 
     Tuple *start_tuple = dict_find(iterator, MESSAGE_KEY_NightStart);
     if (start_tuple) {
-      s_night_start = start_tuple->value->int32;
+      s_night_start = prv_clamp_hour(start_tuple->value->int32);
       persist_write_int(PERSIST_KEY_NIGHT_START, s_night_start);
     }
     Tuple *end_tuple = dict_find(iterator, MESSAGE_KEY_NightEnd);
     if (end_tuple) {
-      s_night_end = end_tuple->value->int32;
+      s_night_end = prv_clamp_hour(end_tuple->value->int32);
       persist_write_int(PERSIST_KEY_NIGHT_END, s_night_end);
     }
     layer_mark_dirty(s_digits_layer);
     layer_mark_dirty(s_date_layer);
   }
-}
-
-// One frame of the lock-on ramp: count down and repaint. prv_snow_permille()
-// reads s_shimmer_left, so each frame snows less of the minute ink than the
-// last (freshly randomised); the frame that lands on 0 renders it clean.
-static void prv_shimmer_tick(void *context) {
-  s_shimmer_timer = NULL;
-  if (s_shimmer_left > 0) s_shimmer_left--;
-  layer_mark_dirty(s_digits_layer);  // snow only touches the minute row
-  if (s_shimmer_left > 0) {
-    s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
-  } else if (s_shimmer_out) {
-    s_exact = false;  // lock-out ramp finished — minute row is passive static again
-  }
-}
-
-// Wall-clock minute a manual refresh locked onto — the exact reading is only
-// truthful until the clock ticks past it (see prv_tick_handler). -1 = none.
-static int s_exact_hour = -1;
-static int s_exact_min = -1;
-
-// Refresh the minute row to the exact time unless it's already on screen.
-static void prv_refresh_to_exact(void) {
-  if (s_every_minute) return;
-  time_t now = time(NULL);
-  struct tm *t = localtime(&now);
-  if (s_exact && !s_shimmer_out &&
-      prv_display_hour(t) == s_drawn_hour && t->tm_min == s_drawn_min) {
-    return;  // nothing would change — don't spend a repaint
-  }
-  s_exact = true;
-  s_exact_hour = t->tm_hour;
-  s_exact_min = t->tm_min;
-  s_shimmer_out = false;
-  s_shimmer_left = SHIMMER_FRAMES;
-  if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
-  s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
-  layer_mark_dirty(s_digits_layer);  // minute row: snow -> clean (date row is unaffected now)
 }
 
 // Recolour a digit by poking the sheet's palette — tint every visible palette
@@ -254,49 +138,6 @@ static void prv_set_ink(GBitmap *b, GColor c) {
       pal[i].b = c.b;
     }
   }
-}
-
-// Snow palette: each solid minute-ink pixel is replaced by a random entry.
-// White/LightGray only (the old mix) barely registers on the emery reflective
-// LCD unlit — too little contrast. This spread runs white down to black, so the
-// passive minutes read as a genuinely noisy, half-lost signal. Tune by editing
-// the table: more Black = more "dropout" holes, more White = brighter static.
-// ponytail: shared across emery + gabbro; re-check the gabbro round slot if the
-// mix changes (it clamps fine today).
-static const uint8_t SNOW[4] = {
-  GColorWhiteARGB8, GColorLightGrayARGB8, GColorDarkGrayARGB8, GColorBlackARGB8,
-};
-
-// Overwrite the solid minute-ink pixels inside `r` with random `snow` "snow" —
-// a no-signal look for the passive (floored) minutes. Works at the framebuffer
-// level so it needs no offscreen bitmap: only fully-opaque `ink` pixels (the
-// glyph interiors, drawn in `ink` just above) are touched, so the anti-aliased
-// glyph edges survive as a clean outline around the noise.
-//
-// `permille` (1..1000) is the fraction of ink pixels replaced this frame; the
-// rest stay clean `ink`. The lock-on ramp steps it down so the digits emerge
-// from the noise. ponytail: two rand() calls per snowed pixel (gate + palette)
-// vs one before — only on the shake path, a one-shot ~320 ms burst, not hot.
-static void prv_staticify(GContext *ctx, GRect r, int permille, uint8_t ink,
-                          const uint8_t snow[4]) {
-  GBitmap *fb = graphics_capture_frame_buffer(ctx);
-  if (!fb) return;
-  GRect b = gbitmap_get_bounds(fb);
-  int y1 = r.origin.y + r.size.h;
-  for (int y = r.origin.y; y < y1; y++) {
-    if (y < b.origin.y || y >= b.origin.y + b.size.h) continue;
-    GBitmapDataRowInfo ri = gbitmap_get_data_row_info(fb, y);
-    int x0 = r.origin.x < ri.min_x ? ri.min_x : r.origin.x;
-    int x1 = r.origin.x + r.size.w;
-    if (x1 > ri.max_x + 1) x1 = ri.max_x + 1;
-    for (int x = x0; x < x1; x++) {
-      if (ri.data[x] == ink &&
-          (permille >= 1000 || (rand() % 1000) < permille)) {
-        ri.data[x] = snow[rand() & 3];
-      }
-    }
-  }
-  graphics_release_frame_buffer(ctx, fb);
 }
 
 static void prv_draw_cell(GContext *ctx, GRect box, const char *text, GFont font,
@@ -364,12 +205,11 @@ static GFont prv_pick_date_font(void) {
 #endif
 
 static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
-  time_t now = time(NULL);
-  struct tm *t = localtime(&now);
+  struct tm *t = &s_now;
 
   bool h24 = clock_is_24h_style();
   int hour = prv_display_hour(t);
-  int disp_min = (s_exact || s_every_minute) ? t->tm_min : s_passive_min;
+  int disp_min = t->tm_min;
 
   // Hour and minute stacked: two digits per row, the pair centred as a unit so a
   // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
@@ -379,33 +219,21 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   // vertical mid-screen (the widest part of the circle), so it spans the full
   // usable width and the rows keep a normal positive gap.
   //
-  // By day the minute row is drawn solid white, then (when the reading is
-  // passive, or mid lock-on ramp) prv_staticify() replaces that ink with
-  // snow — all of it when passive, a shrinking fraction over the ramp. At
-  // night the minute row switches to a pre-rendered hollow red outline
-  // instead — there's no solid fill left to snow, so the static effect is
-  // skipped for the night window. The hour is always exact and never
+  // At night the minute row switches to a pre-rendered hollow red outline
+  // instead of the solid fill used by day. The hour is always exact and never
   // flickers, so it stays solid (dark grey by day, red at night) either way.
-  int snow_permille = prv_snow_permille();
   bool night = prv_is_night(t->tm_hour);
   GColor hour_ink = night ? NIGHT_INK : GColorDarkGray;
   GColor min_ink = night ? NIGHT_INK : GColorWhite;
   if (s_sheet) {
-    int grid_w = s_usable_w;
-    int grid_x = s_pad;
-    int block_h = 2 * s_slot_h + DIGIT_GAP;
-    int block_top = s_digit_band_top + PBL_IF_ROUND_ELSE(2, 0) +
-                    (s_date_top - DIGIT_BAND_BOT_GAP - s_digit_band_top - block_h) / 2;
     int dv[4] = { hour / 10, hour % 10, disp_min / 10, disp_min % 10 };
     bool blank_hour_tens = !h24 && hour < 10;
-    GRect min_rect = GRectZero;
 
     graphics_context_set_compositing_mode(ctx, GCompOpSet);
     for (int row = 0; row < 2; row++) {
       int n = (row == 0 && blank_hour_tens) ? 1 : 2;  // digits shown on this row
-      int row_x = grid_x + (grid_w - n * s_slot_w) / 2;
-      int y = block_top + row * (s_slot_h + DIGIT_GAP);
-      if (row == 1) min_rect = GRect(row_x, y, n * s_slot_w, s_slot_h);
+      int row_x = s_pad + (s_usable_w - n * s_slot_w) / 2;
+      int y = s_block_top + row * (s_slot_h + DIGIT_GAP);
       bool outline_min = night && row == 1 && s_outline_sheet;
       prv_set_ink(outline_min ? s_outline_digit[0] : s_digit[0],
                   row == 0 ? hour_ink : min_ink);
@@ -421,9 +249,6 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
         }
       }
     }
-    if (snow_permille > 0 && !night) {
-      prv_staticify(ctx, min_rect, snow_permille, min_ink.argb, SNOW);
-    }
   } else {
     // Resource-load failure only: fall back to plain text.
     char hour_str[4], min_str[4];
@@ -435,13 +260,9 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
     prv_draw_cell(ctx, GRect(s_pad, s_digit_band_top + 50, s_usable_w, 48),
                   min_str, f, GTextAlignmentRight, GColorWhite);
   }
-
-  s_drawn_hour = hour;
-  s_drawn_min = disp_min;
 }
 
-// Whole date line is drawn in this one colour (no freshness signal on the date
-// row any more — only the minute static carries that). White reads cleanly on
+// Whole date line is drawn in this one colour. White reads cleanly on
 // the unlit transflective LCD without adding a second signal colour; swapped
 // for NIGHT_INK during the night window (see prv_is_night).
 static GColor prv_date_color(int hour) { return prv_is_night(hour) ? NIGHT_INK : GColorWhite; }
@@ -452,8 +273,7 @@ static GColor prv_date_color(int hour) { return prv_is_night(hour) ? NIGHT_INK :
 // window — no freshness signal here. The box is layer-relative (y = 0):
 // s_date_layer is framed at s_date_top.
 static void prv_date_update_proc(Layer *layer, GContext *ctx) {
-  time_t now = time(NULL);
-  struct tm *t = localtime(&now);
+  struct tm *t = &s_now;
 
   if (t->tm_mday != s_str_mday) {
     strftime(s_dow, sizeof s_dow, "%a", t);
@@ -472,81 +292,13 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   prv_draw_cell(ctx, date_box, s_mon, s_date_font, GTextAlignmentRight, color);
 }
 
-// Minute of the last passive (schedule-driven) repaint, so a button press in
-// Quiet Time that lands in that same minute can be recognised as redundant.
-static int s_sched_hour = -1;
-static int s_sched_min = -1;
-
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  // A manual refresh shows the exact minute — but only that minute is true. Once
-  // the clock ticks past it, play the lock-on ramp in reverse: the minute decays
-  // back into static over ~320 ms rather than cutting out in one frame. The ramp
-  // ends by clearing s_exact (prv_shimmer_tick). (Down to a second if you shook
-  // at :59; a near-full minute if you shook at :00 — which is the point.)
-  if (s_exact && !s_shimmer_out &&
-      (tick_time->tm_hour != s_exact_hour || tick_time->tm_min != s_exact_min)) {
-    s_passive_min = tick_time->tm_min;  // hold this minute, don't floor back past it
-    s_shimmer_out = true;
-    s_shimmer_left = SHIMMER_FRAMES;
-    if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
-    s_shimmer_timer = app_timer_register(SHIMMER_MS, prv_shimmer_tick, NULL);
-    layer_mark_dirty(s_digits_layer);  // minute row: clean -> ramp -> snow
+  s_now = *tick_time;
+  layer_mark_dirty(s_digits_layer);
+  // Date row only moves on a date rollover — its colour is constant now.
+  if (tick_time->tm_mday != s_str_mday) {
+    layer_mark_dirty(s_date_layer);
   }
-
-  // The OS wakes the app every minute for its own clock; we only repaint on the
-  // 5-minute grid, Quiet Time or not — a redraw is cheap, so there's no reason
-  // to fall back to hourly while the user's Quiet Time is on (asleep or in a
-  // meeting). Shake-to-wake stays blocked during Quiet Time regardless, since
-  // that's the OS's own backlight behaviour, untouched by this handler.
-  // s_every_minute drops the grid to every tick instead of every 5th.
-  int step = s_every_minute ? 1 : 5;
-  if (tick_time->tm_min % step == 0) {
-    s_exact = false;
-    s_passive_min = tick_time->tm_min;  // already grid-aligned here - resync point
-    s_sched_hour = tick_time->tm_hour;
-    s_sched_min = tick_time->tm_min;
-    layer_mark_dirty(s_digits_layer);
-    // Date row only moves on a date rollover — its colour is constant now.
-    if (tick_time->tm_mday != s_str_mday) {
-      layer_mark_dirty(s_date_layer);
-    }
-  }
-}
-
-static void prv_backlight_handler(bool on) {
-  // Backlight on = the user lit the screen to look (button in the dark, or
-  // shake/flick-to-light). Passive listener on OS behaviour — costs nothing.
-  if (!on) return;
-
-  // In Quiet Time, a button press (e.g. Back, exiting some other screen back
-  // to the face) still wants the exact time — but if the passive grid
-  // repaint already landed in this same minute, forcing an exact/red redraw
-  // now would just flash the screen for no visible change. Skip it.
-  if (quiet_time_is_active()) {
-    time_t now = time(NULL);
-    struct tm *t = localtime(&now);
-    if (t->tm_hour == s_sched_hour && t->tm_min == s_sched_min) return;
-  }
-  prv_refresh_to_exact();
-}
-
-static void prv_tap_handler(AccelAxisType axis, int32_t direction) {
-  // Daylight refresh: a wrist flick / tap, when the backlight wouldn't fire
-  // because it's bright out. The guard in prv_refresh_to_exact() keeps a walk
-  // from repainting the face on every stride.
-  //
-  // Suppressed during Quiet Time — a sleeping wrist shouldn't relight the
-  // face. The backlight/button path (prv_backlight_handler) stays live: a
-  // deliberate button press in the dark still wants the exact time.
-  if (quiet_time_is_active()) return;
-  prv_refresh_to_exact();
-}
-
-static void prv_set_tap_service(bool enabled) {
-  if (enabled == s_tap_service_active) return;
-  if (enabled) accel_tap_service_subscribe(prv_tap_handler);
-  else accel_tap_service_unsubscribe();
-  s_tap_service_active = enabled;
 }
 
 static void prv_window_load(Window *window) {
@@ -554,17 +306,13 @@ static void prv_window_load(Window *window) {
   GRect bounds = layer_get_bounds(window_layer);
   window_set_background_color(window, GColorBlack);
 
-  time_t now = time(NULL);
-  s_passive_min = prv_floor5(localtime(&now)->tm_min);  // first render, before any tick fires
-  s_every_minute = !persist_exists(PERSIST_KEY_REDRAW_MODE) ||
-                   persist_read_bool(PERSIST_KEY_REDRAW_MODE);
   s_night_enabled = persist_exists(PERSIST_KEY_NIGHT_ENABLED) &&
                     persist_read_bool(PERSIST_KEY_NIGHT_ENABLED);
   if (persist_exists(PERSIST_KEY_NIGHT_START)) {
-    s_night_start = persist_read_int(PERSIST_KEY_NIGHT_START);
+    s_night_start = prv_clamp_hour(persist_read_int(PERSIST_KEY_NIGHT_START));
   }
   if (persist_exists(PERSIST_KEY_NIGHT_END)) {
-    s_night_end = persist_read_int(PERSIST_KEY_NIGHT_END);
+    s_night_end = prv_clamp_hour(persist_read_int(PERSIST_KEY_NIGHT_END));
   }
 
   s_pad = PAD;
@@ -623,6 +371,15 @@ static void prv_window_load(Window *window) {
 
   s_digit_band_top = top_margin;
 
+  {
+    int block_h = 2 * s_slot_h + DIGIT_GAP;
+    s_block_top = s_digit_band_top + PBL_IF_ROUND_ELSE(2, 0) +
+                  (s_date_top - DIGIT_BAND_BOT_GAP - s_digit_band_top - block_h) / 2;
+  }
+
+  time_t now = time(NULL);
+  s_now = *localtime(&now);
+
   // Digits above, date below, split at s_date_top so the two dirty regions never
   // intersect — marking one never re-runs the other's update proc.
   s_digits_layer = layer_create(GRect(0, 0, bounds.size.w, s_date_top));
@@ -635,7 +392,6 @@ static void prv_window_load(Window *window) {
 }
 
 static void prv_window_unload(Window *window) {
-  if (s_shimmer_timer) app_timer_cancel(s_shimmer_timer);
   layer_destroy(s_digits_layer);
   layer_destroy(s_date_layer);
   for (int i = 0; i < 10; i++) {
@@ -659,22 +415,16 @@ static void prv_init(void) {
   // localised weekday/month abbreviations; prv_utf8_upper handles the casing.
   setlocale(LC_ALL, i18n_get_system_locale());
 
-  srand(time(NULL));  // seeds the minute-snow noise
-
   tick_timer_service_subscribe(MINUTE_UNIT, prv_tick_handler);
-  backlight_service_subscribe(prv_backlight_handler);
-  prv_set_tap_service(!s_every_minute);
 
-  // Inbox only — the phone settings page pushes MESSAGE_KEY_RedrawMode; the
-  // watch never sends anything back, so the outbox is 0.
+  // Inbox only — the phone settings page pushes the night-colour settings;
+  // the watch never sends anything back, so the outbox is 0.
   app_message_register_inbox_received(prv_inbox_received_handler);
   app_message_open(app_message_inbox_size_maximum(), 0);
 }
 
 static void prv_deinit(void) {
   app_message_deregister_callbacks();
-  prv_set_tap_service(false);
-  backlight_service_unsubscribe();
   tick_timer_service_unsubscribe();
   window_destroy(s_window);
 }

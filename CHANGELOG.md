@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Removed the 5-minute-grid passive display and its "Time refresh" setting
+  entirely: the TV-static/shimmer fill, shake/tap/backlight lock-on ramp, and
+  the `RedrawMode` phone setting. The face now always redraws every minute,
+  exact, with no static and no shake needed — see
+  `src/dev_docs/decisions.md` ("5-minute grid and 'Time refresh' setting —
+  removed 2026-09-28") for the rationale. This supersedes all the
+  Time-refresh/static/shake entries below.
 - Settings page saves Time refresh and Night colour together with one button.
 - Time refresh now defaults to every minute for new settings-page users.
 - During Night colour, minute digits have a 4px red outline while hour digits

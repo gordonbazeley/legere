@@ -4,6 +4,7 @@
 # Feel free to customize this to your needs.
 #
 import glob
+import json
 import os.path
 import shutil
 import subprocess
@@ -28,6 +29,8 @@ def configure(ctx):
 
 def build(ctx):
     ctx.load('pebble_sdk')
+
+    _generate_settings_html_js(ctx)
 
     build_worker = os.path.exists('worker_src')
     binaries = []
@@ -57,6 +60,16 @@ def build(ctx):
                    js_entry_file='src/pkjs/index.js')
 
     ctx.add_post_fun(_minify_and_copy_pbw)
+
+
+# settings-html.js is a generated wrapper (pkjs can only require .js/.json,
+# not .html) around the real source, src/pkjs/settings.html. Regenerating it
+# here on every build means the two files can never drift out of sync.
+def _generate_settings_html_js(ctx):
+    src = ctx.path.find_node('src/pkjs/settings.html')
+    html = src.read()
+    js = 'module.exports = {};\n'.format(json.dumps(html))
+    ctx.path.make_node('src/pkjs/settings-html.js').write(js)
 
 
 # Every build: drop the unused JS source map (pebble-tool always bundles it),

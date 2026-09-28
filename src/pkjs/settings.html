@@ -1,19 +1,11 @@
 <!DOCTYPE html>
 <!--
   Editable source for the companion config page. pkjs loads the generated
-  string wrapper, not this file, so regenerate it after any edit:
+  string wrapper (src/pkjs/settings-html.js), not this file directly — the
+  wscript build regenerates it from this file automatically, so no manual
+  step is needed after an edit (just rebuild before sideloading).
 
-    node -e 'const fs=require("fs");fs.writeFileSync("src/pkjs/settings-html.js","module.exports = "+JSON.stringify(fs.readFileSync("src/pkjs/settings.html","utf8"))+";\n")'
-
-  Preview in a browser with:  node src/open_config.js  (--redraw=1 pre-selects
-  the "every minute" radio)
-
-  The "Time refresh" section is a real setting (a stopgap — see decisions.md —
-  removed once touch is enabled for watchapps). index.js substitutes the INIT
-  marker in the script below with `var REDRAW_MODE=<0|1>` (its last saved
-  value). Saving navigates to pebblejs://close#<json>, the standard Pebble
-  config-page handoff: index.js's 'webviewclosed' listener relays the choice to
-  the watch as an AppMessage (MESSAGE_KEY_RedrawMode), which persists it.
+  Preview in a browser with:  node src/open_config.js
 
   "Night colour" dims the face to a low red during a wall-clock hour window,
   to cut blue/white light at night. Same handoff pattern: index.js also
@@ -74,23 +66,9 @@
 <div class="app">
   <header class="hd">
     <h1 class="wordmark">legere</h1>
-    <p class="tagline">A quiet watchface. The minute reads as static until you shake your wrist to lock on.</p>
+    <p class="tagline">A quiet watchface.</p>
   </header>
   <main class="body">
-    <section>
-      <p class="seclabel">Time refresh</p>
-      <div class="card">
-        <p>How the minute updates while you're wearing it.</p>
-        <label class="radio-row">
-          <input type="radio" name="redrawMode" value="1" checked>
-          <span>Every minute &mdash; always exact, no shake needed</span>
-        </label>
-        <label class="radio-row">
-          <input type="radio" name="redrawMode" value="0">
-          <span>Every 5 minutes &mdash; shake to reveal the exact minute</span>
-        </label>
-      </div>
-    </section>
     <section>
       <p class="seclabel">Night colour</p>
       <div class="card">
@@ -129,23 +107,13 @@
 <script>
   /*INIT*/
   (function () {
-    // index.js replaces the INIT marker with `var REDRAW_MODE=<0|1>` and
-    // `var NIGHT=<json>`; missing in a plain static preview, so default.
-    var mode = (typeof REDRAW_MODE !== 'undefined') ? REDRAW_MODE : 1;
-    var radios = document.getElementsByName('redrawMode');
-    for (var i = 0; i < radios.length; i++) {
-      radios[i].checked = (Number(radios[i].value) === mode);
-    }
+    // index.js replaces the INIT marker with `var NIGHT=<json>`; missing in a
+    // plain static preview, so default.
     document.getElementById('saveSettings').onclick = function () {
-      var selected = 0;
-      for (var i = 0; i < radios.length; i++) {
-        if (radios[i].checked) selected = Number(radios[i].value);
-      }
       // Standard Pebble config-page handoff: navigating to pebblejs://close#
       // closes this webview and delivers the payload to index.js's
       // 'webviewclosed' listener, which relays it to the watch as AppMessage.
       window.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify({
-        redrawMode: selected,
         nightEnabled: document.getElementById('nightEnabled').checked ? 1 : 0,
         nightStart: Number(startSel.value),
         nightEnd: Number(endSel.value),

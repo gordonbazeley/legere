@@ -97,10 +97,12 @@ is the grill session captured in `decisions.md`.
   code in `index.js`, and the `#logSection` + `--log` branch in `settings.html`
   / `open_config.js`. The audit found the per-minute `persist_write_data` was
   the only meaningful battery/flash cost in the codebase and the grid question
-  it answered is settled. **Kept:** shake-to-wake, the `RedrawMode` setting +
-  settings page (`prv_inbox_received_handler` trimmed to just that branch;
+  it answered is settled. **Kept:** the night-colour setting + settings page
+  (`prv_inbox_received_handler` trimmed to just that branch;
   `app_message_open(..., 0)`, inbox-only), the `configurable` capability. Old
   persist keys (190, 200–213) on installed watches left to rot — no migration.
+  (Shake-to-wake and the `RedrawMode` setting mentioned here at the time were
+  themselves removed 2026-09-28 — see `decisions.md`.)
 
 ## Store v1
 

@@ -1,5 +1,32 @@
 # legere — Key Decisions
 
+## 5-minute grid and "Time refresh" setting — removed 2026-09-28
+
+**Was:** The passive 5-minute repaint grid (floored minute, TV-static fill,
+shake/tap/backlight lock-on ramp) as the app's default display, plus the
+`RedrawMode` phone setting (`MESSAGE_KEY_RedrawMode`, `PERSIST_KEY_REDRAW_MODE`,
+`s_every_minute`) that let a user opt into always-exact-every-minute instead.
+
+**Removed because:** too much complexity for too little benefit (user call).
+The face now always shows the exact minute, redrawn every tick — the
+behaviour `RedrawMode`'s "every minute" option already provided as the
+non-default choice. Gone with it: `s_exact`, `s_passive_min`, `s_every_minute`,
+`prv_floor5`, the shimmer ramp (`SHIMMER_FRAMES`/`SHIMMER_MS`,
+`prv_shimmer_tick`, `s_shimmer_left`/`s_shimmer_out`), the snow/staticify
+render path (`prv_staticify`, `SNOW[]`, `prv_snow_permille`), shake-to-reveal
+(`accel_tap_service`, `prv_tap_handler`, `prv_set_tap_service`), the
+backlight-forces-exact path (`prv_backlight_handler`), and the settings page's
+"Time refresh" radio section. The message key registry in `package.json` drops
+`RedrawMode`.
+
+**Supersedes:** "The 5-minute grid is an identity choice, not a power
+optimisation", "Quiet Time keeps the same 5-minute grid, no hourly fallback",
+"No A/B control build to measure the grid", "Passive minutes render as TV
+static", "An expiring exact reading holds the real minute, doesn't floor
+backward", and "Time refresh setting: 5-minute-plus-shake vs. every-minute"
+below — kept as history of how the face got here, no longer describing
+current behaviour.
+
 ## The 5-minute grid is an identity choice, not a power optimisation
 
 **Chose:** Keep the passive 5-minute repaint grid — the same cadence during
@@ -298,14 +325,13 @@ reported battery % dropped a step (~10–100 writes/day) plus one per manual
 refresh — real energy, and it burns the persist region's ~100k-cycle wear
 budget. Shipping code was otherwise clean.
 
-**Kept:** shake-to-wake (`accel_tap_service`), the "Time refresh" setting
-(`RedrawMode`, now the only message key), the ko-fi settings page, and the
-`configurable` capability. The watch's AppMessage channel is inbox-only now
-(`app_message_open(..., 0)`). Old persist keys (190, 200–213) on installed
-watches are left in place — nothing reads them, no migration worth writing
-pre-launch. The phone remembers the Time refresh choice in `localStorage`
-rather than reading it back from the watch, since the watch→phone export path
-is gone.
+**Kept:** the ko-fi settings page and the `configurable` capability. The
+watch's AppMessage channel is inbox-only now (`app_message_open(..., 0)`).
+Old persist keys (190, 200–213) on installed watches are left in place —
+nothing reads them, no migration worth writing pre-launch.
+(Shake-to-wake and the "Time refresh" setting mentioned here at the time were
+later removed too — see "5-minute grid and 'Time refresh' setting — removed
+2026-09-28" above.)
 
 ## Platforms: emery + gabbro only
 

@@ -3,33 +3,29 @@
 ## What it is
 
 A calm, deliberate Pebble watchface. Bold overlapping slab numerals for the
-time; the **minutes are shown soft** (rendered as TV static, floored to a
-multiple of 5) unless the user asks for the exact minute with a wrist shake.
-A date row underneath is a plain white constant — the minute static is the
-face's only freshness signal (see "One freshness signal" below).
+time, always shown exact, redrawn every minute. A date row underneath is a
+plain white constant.
+
+The face previously floored the minute to a 5-minute grid and rendered it as
+TV static until a shake revealed the exact time, with a `RedrawMode` setting
+to opt into always-exact instead — removed 2026-09-28 for too much complexity
+for too little benefit; see `decisions.md`.
 
 It is **not** a "lowest-power" face as its headline (that was an early framing —
 see `decisions.md` → "The 5-minute grid is an identity choice, not a power
-optimisation"). It is a low-*fuss* face that also happens to do nothing
-wasteful.
+optimisation", now historical). It is a low-*fuss* face that also happens to
+do nothing wasteful.
 
-Single-file watch app. The phone companion is a settings page with "Time
-refresh" and "Night colour" controls, saved together with one Save button,
-plus info + ko-fi link. Both settings persist on the watch; see `decisions.md`.
+Single-file watch app. The phone companion is a settings page with a "Night
+colour" control, saved with one Save button, plus info + ko-fi link. The
+setting persists on the watch; see `decisions.md`.
 
 ```
 tick (every minute, from the OS)
-  ├── if a forced-exact reading's minute has ticked over: pin s_passive_min to
-  │   the real minute, start the reverse ramp (clears s_exact on its last frame)
-  ├── on the 5-minute grid (every minute if s_every_minute): mark dirty, passive repaint
-  │
-shake / tap  ──┐
-backlight on ──┼── force an exact repaint (s_exact = true), unless nothing would change
-               │
+  └── mark dirty, repaint
         prv_digits_update_proc  (s_digits_layer)
           ├── hour digits  (bitmap blits: dark grey by day, 3px hollow red asset at night)
-          └── minute digits(white, then prv_staticify() snows a fraction: all when
-          │                 passive, ramping to none over the lock-on / back to all on lock-out)
+          └── minute digits (white by day, hollow red outline at night)
         prv_date_update_proc    (s_date_layer — only marked dirty on a date rollover)
           └── date row     (weekday / day / month; whole row a constant white)
 ```
@@ -75,81 +71,22 @@ can be regenerated ~10% larger in the same vertical budget. The hour row is
 minute ink reads as clearly "in front". Committed in `67ae9f5`. The digit
 foot/head collision this causes is intentional and accepted.
 
-### One freshness signal: the minute static
+### Freshness
 
-- **Minute digits**: rendered as TV-static "snow" while passive, resolving to
-  solid `GColorWhite` when exact. A shake plays a lock-on *ramp* first
-  (`SHIMMER_FRAMES` × `SHIMMER_MS`, ~320 ms): the snowed fraction of the minute
-  ink steps down from all of it to none, so the digits emerge from the noise
-  like a tuner pulling a station in. The ramp runs in reverse (`s_shimmer_out`,
-  none → all) when the exact reading expires, so the minute dissolves back into
-  static rather than cutting out in one frame.
-- **Hour row**: always solid `GColorDarkGray`, never flickers — the hour is
-  always exact, so signalling anything on it would be a lie.
-- **Date row**: whole line a constant `GColorWhite` (`DATE_COLOR`). It used to
-  carry a red/blue freshness cue on the month, then a mid-blue whole-row tint;
-  both dropped — the static already says it, and hardcoded white is the
-  simplest thing that reads on the unlit LCD.
-
-Hour/minute digits are tinted by `prv_set_ink()` poking the sprite sheet's
-palette in-place before each blit. The static is `prv_staticify(ctx, rect,
-permille)`: after the minute glyphs are drawn solid white, it captures the
-framebuffer (`graphics_capture_frame_buffer`, emery/gabbro 8-bit) and, for each
-fully-opaque white pixel in the minute-row rect, with probability `permille`/1000
-replaces it with a random entry from `SNOW[]` (white → light grey → dark grey →
-black — a real dropout spread, not just greys, so it reads on the unlit
-reflective LCD). Anti-aliased edge pixels (not pure white) are left, so the
-glyph keeps a clean outline. `permille` comes from `prv_snow_permille()`: while a
-ramp is in flight it wins over `s_exact` — lock-on steps `SHIMMER_FRAMES → 0` as
-`PASSIVE_SNOW_PERMILLE → 0`, lock-out (`s_shimmer_out`) steps it the reverse;
-otherwise `PASSIVE_SNOW_PERMILLE` (350, dialed back from a full 1000) when
-passive, 0 when exact. `s_shimmer_left` is an `AppTimer` countdown started by
-`prv_refresh_to_exact` (lock-on) or `prv_tick_handler` (lock-out); the lock-out
-ramp's final `prv_shimmer_tick` clears `s_exact`.
+The minute is always exact, so there's no separate freshness signal to carry.
+Hour and minute digits are tinted by `prv_set_ink()` poking the sprite sheet's
+palette in-place before each blit — `GColorDarkGray`/`GColorWhite` by day,
+`NIGHT_INK` (solid hour, hollow outline minute) at night.
 
 ## Time model
 
 - `prv_display_hour()` — 12/24h from `clock_is_24h_style()` (system preference).
-- `s_passive_min` — the minute shown while passive. `prv_tick_handler` keeps it
-  grid-aligned (`prv_floor5()`-equivalent, since it only writes tick_time->tm_min
-  at ticks where that's already a multiple of the step) during normal
-  operation, but pins it to the real (unfloored) minute the instant an exact
-  reading expires — otherwise it would floor back to the grid mark *before*
-  that minute (exact "12:33" → static "12:30"), which reads as the clock
-  rewinding. Re-syncs to the grid at the next scheduled tick either way.
-- `s_exact` — `false` after a scheduled passive repaint, `true` after a
-  shake/tap/backlight-forced one. Drives the minute static only (whether
-  `prv_staticify` runs, and at what density during the ramp).
-- `s_exact_hour` / `s_exact_min` — the wall-clock minute a forced-exact repaint
-  locked onto. The first tick the clock reads a different minute, `prv_tick_handler`
-  starts the reverse ramp (`s_shimmer_out`); `s_exact` clears on its last frame.
-  So an exact reading lasts at most to the end of its own minute (a second if you
-  shook at `:59`, nearly a minute if at `:00`) plus the ~320 ms ramp-out — then
-  the face is back to passive static, since the shown digits are now stale.
-- `s_drawn_hour` / `s_drawn_min` — what the last repaint actually put on screen,
-  so a refresh that would change nothing skips the redraw entirely.
+- The minute shown is always `t->tm_min` — no floor, no separate passive state.
 
 ## Repaint schedule (`prv_tick_handler`)
 
-The OS wakes the app every minute for its own clock. legere repaints only when
-`tm_min % 5 == 0`, Quiet Time or not (see `decisions.md` → "Quiet Time keeps
-the same 5-minute grid, no hourly fallback") — `:00` and midnight are
-multiples of 5, so hour and date rollover stay covered. A deliberate look
-still lights the backlight, which forces an exact repaint
-(`prv_backlight_handler`), regardless of how fresh the passive grid already is.
-
-Forced-exact paths:
-- **`prv_backlight_handler`** — backlight on (button in the dark, flick-to-light).
-  Stays live during Quiet Time, but skips if the passive grid repaint already
-  landed in this same minute (`s_sched_hour`/`s_sched_min`).
-- **`prv_tap_handler`** — wrist flick/tap in daylight (when the backlight
-  wouldn't fire). Suppressed entirely during Quiet Time (a sleeping wrist
-  shouldn't relight the face).
-- Both funnel through `prv_refresh_to_exact()`, which no-ops if the exact time is
-  already on screen — this is what stops a walk from repainting every stride.
-  (An exact reading now expires at the next minute tick, so during a walk the
-  face cycles static → lock-on ramp → clean → lock-out ramp → static about once a minute rather
-  than sitting clean between grid ticks.)
+The OS wakes the app every minute for its own clock; legere repaints on every
+tick.
 
 ## Power model
 
@@ -164,14 +101,15 @@ legere's controllable levers, in full:
 2. Keep `graphics_text_layout_get_content_size` (`prv_measure`) off the redraw
    path — **done** (only called in `prv_window_load`).
 3. `mark_dirty` only the layer that changed, not the whole window — **done**
-   (`s_digits_layer` / `s_date_layer` are disjoint; the date is repainted only on
-   a rollover or an `s_exact` flip, shimmer ticks touch the digits layer only).
+   (`s_digits_layer` / `s_date_layer` are disjoint; the date is repainted only
+   on a rollover).
 4. Cache the formatted time/date strings, re-render on change only — **done**
    (date strings keyed on `tm_mday` via `s_str_mday`; `hour_str`/`min_str` moved
    into the resource-failure fallback).
 
-The 5-minute grid saves an estimated ~6–26 µA (≈ under one day over 21) — real
-but a rounding error. It is kept as an identity choice, not a power play.
+The face redraws every minute; per `decisions.md` this was already estimated
+to cost only ~6–26 µA relative to a 5-minute cadence — a rounding error next
+to backlight/BLE/HR drains.
 
 ## Battery guidance (for the store listing)
 
@@ -205,9 +143,10 @@ battery %), an AppMessage export to the settings page, and hourly `APP_LOG`
 "row" lines + `tools/pebble-log-to-csv.py` were carried while the 5-minute grid
 question was open. Removed once that was settled — see `decisions.md`. An audit
 for battery/flash cost found the sampler's per-minute `persist_write_data` was
-the only non-trivial drain in the codebase; nothing replaced it. The one
-surviving message key is `RedrawMode` (the Time refresh setting), which is
-inbox-only now — the watch never sends anything to the phone.
+the only non-trivial drain in the codebase; nothing replaced it. The
+remaining message keys (`NightEnabled`/`NightStart`/`NightEnd`, the night
+colour setting — `RedrawMode` was removed 2026-09-28, see `decisions.md`) are
+inbox-only — the watch never sends anything to the phone.
 
 ## Platforms
 

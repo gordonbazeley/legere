@@ -22,7 +22,6 @@
       "configurable"
     ],
     "messageKeys": [
-      "RedrawMode",
       "NightEnabled",
       "NightStart",
       "NightEnd"
