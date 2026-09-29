@@ -293,10 +293,12 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
 }
 
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+  bool was_night = prv_is_night(s_now.tm_hour);
   s_now = *tick_time;
   layer_mark_dirty(s_digits_layer);
-  // Date row only moves on a date rollover — its colour is constant now.
-  if (tick_time->tm_mday != s_str_mday) {
+  // Date row repaints on a date rollover, or when the hour crosses a Night
+  // colour window edge (its colour follows prv_is_night).
+  if (tick_time->tm_mday != s_str_mday || prv_is_night(tick_time->tm_hour) != was_night) {
     layer_mark_dirty(s_date_layer);
   }
 }
