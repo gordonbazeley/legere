@@ -1,6 +1,7 @@
 #include <pebble.h>
 #include <ctype.h>
 #include <locale.h>
+#include <stdlib.h>
 #include <string.h>
 
 static Window *s_window;
@@ -93,6 +94,23 @@ static int prv_display_hour(const struct tm *t) {
   return h;
 }
 
+// Read an integer tuple whatever width/signedness the phone packed it as —
+// value->int32 on a 1- or 2-byte tuple reads garbage past the end.
+static int32_t prv_tuple_int(const Tuple *t) {
+  if (t->type == TUPLE_INT) {
+    if (t->length == 1) return t->value->int8;
+    if (t->length == 2) return t->value->int16;
+    return t->value->int32;
+  }
+  if (t->type == TUPLE_UINT) {
+    if (t->length == 1) return t->value->uint8;
+    if (t->length == 2) return t->value->uint16;
+    return (int32_t)t->value->uint32;
+  }
+  if (t->type == TUPLE_CSTRING) return atoi(t->value->cstring);
+  return 0;
+}
+
 static void prv_inbox_received_handler(DictionaryIterator *iterator, void *context) {
   // "Night colour" setting: dims the face to red during a hour window.
   // NightEnabled is a plain flag; NightStart/NightEnd only arrive alongside
@@ -100,19 +118,21 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
   // rather than gating on presence keeps this in one block.
   Tuple *night_enabled_tuple = dict_find(iterator, MESSAGE_KEY_NightEnabled);
   if (night_enabled_tuple) {
-    s_night_enabled = night_enabled_tuple->value->int32 != 0;
+    s_night_enabled = prv_tuple_int(night_enabled_tuple) != 0;
     persist_write_bool(PERSIST_KEY_NIGHT_ENABLED, s_night_enabled);
 
     Tuple *start_tuple = dict_find(iterator, MESSAGE_KEY_NightStart);
     if (start_tuple) {
-      s_night_start = prv_clamp_hour(start_tuple->value->int32);
+      s_night_start = prv_clamp_hour(prv_tuple_int(start_tuple));
       persist_write_int(PERSIST_KEY_NIGHT_START, s_night_start);
     }
     Tuple *end_tuple = dict_find(iterator, MESSAGE_KEY_NightEnd);
     if (end_tuple) {
-      s_night_end = prv_clamp_hour(end_tuple->value->int32);
+      s_night_end = prv_clamp_hour(prv_tuple_int(end_tuple));
       persist_write_int(PERSIST_KEY_NIGHT_END, s_night_end);
     }
+    APP_LOG(APP_LOG_LEVEL_INFO, "Night colour: enabled=%d %d-%d",
+            s_night_enabled, s_night_start, s_night_end);
     layer_mark_dirty(s_digits_layer);
     layer_mark_dirty(s_date_layer);
   }

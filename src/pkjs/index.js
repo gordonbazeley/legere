@@ -27,14 +27,28 @@ function currentNight() {
   }
 }
 
+// AppMessages can be NACKed (watch busy, e.g. right after the config webview
+// closes or while the face is still starting) and are otherwise silently
+// dropped, so retry a few times before giving up.
+function sendWithRetry(message, triesLeft) {
+  Pebble.sendAppMessage(message, function () {
+    console.log('Night colour sent: ' + JSON.stringify(message));
+  }, function (e) {
+    console.log('Night colour send failed (' + triesLeft + ' tries left)');
+    if (triesLeft > 0) {
+      setTimeout(function () { sendWithRetry(message, triesLeft - 1); }, 1000);
+    }
+  });
+}
+
 function syncNight() {
   var night = currentNight();
   if (night.enabled || localStorage.getItem('nightEnabled') !== null) {
-    Pebble.sendAppMessage({
+    sendWithRetry({
       'NightEnabled': night.enabled ? 1 : 0,
       'NightStart': clampHour(night.start, 21),
       'NightEnd': clampHour(night.end, 7),
-    });
+    }, 3);
   }
 }
 
