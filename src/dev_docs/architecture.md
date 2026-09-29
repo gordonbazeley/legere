@@ -17,8 +17,9 @@ optimisation", now historical). It is a low-*fuss* face that also happens to
 do nothing wasteful.
 
 Single-file watch app. The phone companion is a settings page with a "Night
-colour" control, saved with one Save button, plus info + ko-fi link. The
-setting persists on the watch; see `decisions.md`.
+colour" control, saved with one Save button, plus info + ko-fi link. It
+re-sends saved Night colour values on companion startup; the setting also
+persists on the watch. See `decisions.md`.
 
 ```
 tick (every minute, from the OS)

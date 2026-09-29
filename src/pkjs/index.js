@@ -27,6 +27,19 @@ function currentNight() {
   }
 }
 
+function syncNight() {
+  var night = currentNight();
+  if (night.enabled || localStorage.getItem('nightEnabled') !== null) {
+    Pebble.sendAppMessage({
+      'NightEnabled': night.enabled ? 1 : 0,
+      'NightStart': clampHour(night.start, 21),
+      'NightEnd': clampHour(night.end, 7),
+    });
+  }
+}
+
+Pebble.addEventListener('ready', syncNight);
+
 Pebble.addEventListener('showConfiguration', function () {
   var init = 'var NIGHT=' + JSON.stringify(currentNight()) + ';';
   var html = require('./settings-html').replace('/*INIT*/', init);
@@ -52,10 +65,6 @@ Pebble.addEventListener('webviewclosed', function (e) {
       localStorage.setItem('nightStart', String(start));
       localStorage.setItem('nightEnd', String(end));
     } catch (e) {}
-    Pebble.sendAppMessage({
-      'NightEnabled': enabled,
-      'NightStart': start,
-      'NightEnd': end,
-    });
+    syncNight();
   }
 });

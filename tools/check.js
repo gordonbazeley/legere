@@ -4,19 +4,26 @@ var fs = require('fs');
 var vm = require('vm');
 var handlers = {};
 var sent;
+var stored = {};
 var context = {
   Pebble: {
     addEventListener: function(name, fn) { handlers[name] = fn; },
     openURL: function() {},
     sendAppMessage: function(message) { sent = message; },
   },
-  localStorage: { getItem: function() { return null; }, setItem: function() {} },
+  localStorage: { getItem: function(key) { return stored[key] || null; }, setItem: function(key, value) { stored[key] = value; } },
   JSON: JSON, Number: Number, Math: Math, decodeURIComponent: decodeURIComponent,
 };
 vm.runInNewContext(fs.readFileSync('src/pkjs/index.js', 'utf8'), context);
+handlers.ready();
+assert.strictEqual(sent, undefined);
 handlers.webviewclosed({ response: encodeURIComponent(JSON.stringify({
   nightEnabled: 1, nightStart: -4, nightEnd: 99,
 })) });
+assert.strictEqual(sent.NightEnabled, 1);
+assert.strictEqual(sent.NightStart, 0);
+assert.strictEqual(sent.NightEnd, 23);
+handlers.ready();
 assert.strictEqual(sent.NightEnabled, 1);
 assert.strictEqual(sent.NightStart, 0);
 assert.strictEqual(sent.NightEnd, 23);

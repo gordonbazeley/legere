@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The phone companion now re-sends saved Night colour settings when it starts,
+  so a watch reconnect or reinstall receives them without another Save.
 - Removed the 5-minute-grid passive display and its "Time refresh" setting
   entirely: the TV-static/shimmer fill, shake/tap/backlight lock-on ramp, and
   the `RedrawMode` phone setting. The face now always redraws every minute,
