@@ -6,6 +6,8 @@
   black-to-red gradient (matching Night colour red), and the new tagline on
   two lines; footer line removed.
 - Added `store/banner.png` (720x320) and `store/feather.svg` (vector feather).
+- Added store app icons `store/icon-80.png` and `store/icon-144.png` (feather on
+  the black-to-red gradient).
 - App name is now styled "Legere" in the watch display name, settings page,
   README, store listing and docs (filenames and npm name stay lowercase).
 - Night colour is now on by default, 21:00–07:00 (watch default aligned with the

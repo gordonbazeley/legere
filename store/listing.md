@@ -23,7 +23,7 @@ minute in bold white, with the hour behind it in dark grey. A glance tells
 you whether you're running late for your next meeting.
 
 **At night, the hour matters.** From 21:00 to 07:00 by default (adjustable,
-
+or switch it off), the face flips: hours turn solid red and minutes become a
 hollow red outline. Waking in the dark, you only need a rough sense of the
 hour to decide whether you can stay in bed. Red also cuts blue and white
 light, so it's easy on your eyes.
@@ -56,9 +56,6 @@ Feedback and ideas are welcome - please contact me using the link below …
 | Pebble Round 2 (gabbro) | `gabbro-day.png` | `gabbro-night.png` |
 
 Night shots use the default window (21:00–07:00) with Night colour on.
-
-Banner: `banner.png` (720x320, Alfa Slab One + feather on a black-to-red
-gradient); vector feather source in `feather.svg`.
 
 ## Credits
 
