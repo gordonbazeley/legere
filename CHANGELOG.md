@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Date font subset now includes Ø–Þ, fixing a missing glyph for French "AOÛT".
 - Gabbro: minute row now overlaps the hour row like emery; date line is 20px
   with more side padding and sits slightly higher, clear of the bezel.
 - README rewritten for users (store-ready); build/layout/font notes moved to

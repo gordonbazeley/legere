@@ -42,7 +42,7 @@ static bool prv_is_night(int hour) {
 }
 
 // Date line: Quantico Bold (20px on gabbro, 24/20px on emery). Glyph subset in package.json covers A-Z, digits,
-// space, '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL —
+// space, '.', and the Latin-1 accented capitals À-Þ excluding × (+ ß) for FR/DE/ES/IT/PT/NL —
 // Quantico's cmap has no gaps in that set (checked against the full Latin-1
 // accented block, not just what these locales use).
 static GFont s_date_font;

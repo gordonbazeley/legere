@@ -62,14 +62,14 @@
           "type": "font",
           "name": "FONT_DATE_20",
           "file": "fonts/Quantico-Bold.ttf",
-          "characterRegex": "[A-Z0-9 .À-Öß]",
+          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
           "targetPlatforms": ["emery", "gabbro"]
         },
         {
           "type": "font",
           "name": "FONT_DATE_24",
           "file": "fonts/Quantico-Bold.ttf",
-          "characterRegex": "[A-Z0-9 .À-Öß]",
+          "characterRegex": "[A-Z0-9 .À-ÖØ-Þß]",
           "targetPlatforms": ["emery"]
         }
       ]
