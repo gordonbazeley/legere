@@ -46,7 +46,7 @@ heart-rate background sampling to every 30 minutes or hourly.
 **Settings:** open Legere's settings in the Pebble app to turn Night colour on
 and choose the hours (24-hour clock).
 
-Feedback and ideas are welcome.
+Feedback and ideas are welcome - please contact me using the link below …
 
 ## Screenshots
 
@@ -56,6 +56,9 @@ Feedback and ideas are welcome.
 | Pebble Round 2 (gabbro) | `gabbro-day.png` | `gabbro-night.png` |
 
 Night shots use the default window (21:00–07:00) with Night colour on.
+
+Banner: `banner.png` (720x320, Alfa Slab One + feather on a black-to-red
+gradient); vector feather source in `feather.svg`.
 
 ## Credits
 
