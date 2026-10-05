@@ -3,8 +3,8 @@
 ## What works
 
 - `emery` and `gabbro` show stacked, pre-rendered hour/minute sprites.
-- The OS tick repaints digits once a minute. Date text is cached and repaints
-  only on a date rollover.
+- The OS tick repaints digits once a minute. Date text is cached; its row
+  repaints on a date rollover or Night colour boundary.
 - The phone settings page sends Night colour enabled/start/end in one payload,
   then re-sends saved values when the companion starts. The watch clamps and
   persists hours in the range 0–23.
@@ -28,7 +28,7 @@
 
 - Validate French and German date labels on real hardware.
 - Validate dark-grey hour legibility and overlap on an unlit watch.
-- Store listing assets and screenshots are not ready.
+- Store listing text and day/night screenshots are in `store/`; re-shoot after any layout change. Validate gabbro date row (20px) with French/German labels.
 
 ## Key files
 

@@ -27,9 +27,36 @@ tick (every minute, from the OS)
         prv_digits_update_proc  (s_digits_layer)
           ├── hour digits  (dark grey by day, solid red at night)
           └── minute digits (white by day, hollow red outline at night)
-        prv_date_update_proc    (s_date_layer — only marked dirty on a date rollover)
-          └── date row     (weekday / day / month; whole row a constant white)
+        prv_date_update_proc    (s_date_layer — marked dirty on a rollover or Night colour boundary)
+          └── date row     (weekday / day / month; white by day, red at night)
 ```
+
+## Build, run & layout
+
+```sh
+pebble build                          # both targetPlatforms; minified; PBW copied to ~/Nextcloud/pbws
+pebble install --emulator emery       # emery emulator
+pebble install --phone <ip>           # paired phone
+```
+
+`targetPlatforms` in `package.json` is `emery` (Pebble Time 2) and `gabbro`
+(Pebble Round 2) only. `flint` and the legacy platforms are not targeted.
+
+```
+src/c/           watch C source (single file, legere.c)
+src/pkjs/        PebbleKit JS: settings page + handoff
+resources/       digit sprite sheets, Quantico (shipped) and Alfa Slab One (build-time only) fonts
+tools/           gen-digits.sh and helpers, check.js
+package.json     UUID, platforms, resources, message keys
+wscript          wrapper generation + PBW packaging
+```
+
+Fonts: only `Quantico-Bold.ttf` is bundled (two sizes: `FONT_DATE_20` on both platforms,
+`FONT_DATE_24` emery). `AlfaSlabOne-Regular.ttf` is only the
+source for `tools/gen-digits.sh`; it never ships in the PBW. Both are OFL
+(licence files alongside).
+
+SDK docs: <https://developer.repebble.com>
 
 ## Rendering
 
@@ -103,7 +130,7 @@ legere's controllable levers, in full:
    path — **done** (only called in `prv_window_load`).
 3. `mark_dirty` only the layer that changed, not the whole window — **done**
    (`s_digits_layer` / `s_date_layer` are disjoint; the date is repainted only
-   on a rollover).
+   on a rollover or Night colour boundary).
 4. Cache the formatted time/date strings, re-render on change only — **done**
    (date strings keyed on `tm_mday` via `s_str_mday`; `hour_str`/`min_str` moved
    into the resource-failure fallback).

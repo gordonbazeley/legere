@@ -5,8 +5,8 @@
 
 static Window *s_window;
 // Two disjoint sibling layers so a repaint of one never re-runs the other's
-// update proc: the time digits change on every minute tick, the date
-// row only on a date rollover.
+// update proc: the time digits change on every minute tick; the date row
+// only on a date rollover or Night colour boundary.
 static Layer *s_digits_layer;
 static Layer *s_date_layer;
 
@@ -41,7 +41,7 @@ static bool prv_is_night(int hour) {
   return hour >= s_night_start || hour < s_night_end;  // wraps past midnight
 }
 
-// Date line: Quantico Bold. Glyph subset in package.json covers A-Z, digits,
+// Date line: Quantico Bold (20px on gabbro, 24/20px on emery). Glyph subset in package.json covers A-Z, digits,
 // space, '.', and the Latin-1 accented capitals (+ ß) for FR/DE/ES/IT/PT/NL —
 // Quantico's cmap has no gaps in that set (checked against the full Latin-1
 // accented block, not just what these locales use).
@@ -74,8 +74,9 @@ static struct tm s_now;
 
 #define PAD PBL_IF_ROUND_ELSE(20, 6)
 // px between the hour and minute rows; negative on emery = the minute row
-// deliberately overlaps the hour row (dense stacked effect, hour drawn dark).
-#define DIGIT_GAP PBL_IF_ROUND_ELSE(6, -20)
+// deliberately overlaps the hour row (dense stacked effect, hour drawn dark);
+// gabbro overlaps by the same ~19% of the slot height.
+#define DIGIT_GAP PBL_IF_ROUND_ELSE(-14, -20)
 #define DIGIT_BAND_BOT_GAP PBL_IF_ROUND_ELSE(6, 5)  // px between the minute row and the date row
 
 static GSize prv_measure(const char *text, GFont font) {
@@ -100,21 +101,36 @@ static void prv_inbox_received_handler(DictionaryIterator *iterator, void *conte
   // rather than gating on presence keeps this in one block.
   Tuple *night_enabled_tuple = dict_find(iterator, MESSAGE_KEY_NightEnabled);
   if (night_enabled_tuple) {
-    s_night_enabled = night_enabled_tuple->value->int32 != 0;
-    persist_write_bool(PERSIST_KEY_NIGHT_ENABLED, s_night_enabled);
+    bool changed = false;
+    bool night_enabled = night_enabled_tuple->value->int32 != 0;
+    if (s_night_enabled != night_enabled) {
+      s_night_enabled = night_enabled;
+      persist_write_bool(PERSIST_KEY_NIGHT_ENABLED, s_night_enabled);
+      changed = true;
+    }
 
     Tuple *start_tuple = dict_find(iterator, MESSAGE_KEY_NightStart);
     if (start_tuple) {
-      s_night_start = prv_clamp_hour(start_tuple->value->int32);
-      persist_write_int(PERSIST_KEY_NIGHT_START, s_night_start);
+      int night_start = prv_clamp_hour(start_tuple->value->int32);
+      if (s_night_start != night_start) {
+        s_night_start = night_start;
+        persist_write_int(PERSIST_KEY_NIGHT_START, s_night_start);
+        changed = true;
+      }
     }
     Tuple *end_tuple = dict_find(iterator, MESSAGE_KEY_NightEnd);
     if (end_tuple) {
-      s_night_end = prv_clamp_hour(end_tuple->value->int32);
-      persist_write_int(PERSIST_KEY_NIGHT_END, s_night_end);
+      int night_end = prv_clamp_hour(end_tuple->value->int32);
+      if (s_night_end != night_end) {
+        s_night_end = night_end;
+        persist_write_int(PERSIST_KEY_NIGHT_END, s_night_end);
+        changed = true;
+      }
     }
-    layer_mark_dirty(s_digits_layer);
-    layer_mark_dirty(s_date_layer);
+    if (changed) {
+      layer_mark_dirty(s_digits_layer);
+      layer_mark_dirty(s_date_layer);
+    }
   }
 }
 
@@ -285,7 +301,7 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   }
 
   GColor color = prv_date_color(t->tm_hour);
-  int date_w = PBL_IF_ROUND_ELSE(174, s_usable_w);  // round: narrower than usable so the row clears the arc
+  int date_w = PBL_IF_ROUND_ELSE(160, s_usable_w);  // round: narrower than usable so the row clears the arc
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
   prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, color);
   prv_draw_cell(ctx, date_box, s_dom, s_date_font, GTextAlignmentCenter, color);
@@ -293,10 +309,10 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
 }
 
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+  bool night_changed = prv_is_night(s_now.tm_hour) != prv_is_night(tick_time->tm_hour);
   s_now = *tick_time;
   layer_mark_dirty(s_digits_layer);
-  // Date row only moves on a date rollover — its colour is constant now.
-  if (tick_time->tm_mday != s_str_mday) {
+  if (tick_time->tm_mday != s_str_mday || night_changed) {
     layer_mark_dirty(s_date_layer);
   }
 }
@@ -327,7 +343,7 @@ static void prv_window_load(Window *window) {
 #if defined(PBL_PLATFORM_EMERY)
   s_date_font = prv_pick_date_font();   // 24px, or 20px where the locale is too wide
 #else
-  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_16));
+  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_20));
 #endif
   s_date_font_custom = (s_date_font != NULL);
   if (!s_date_font) s_date_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
@@ -365,7 +381,7 @@ static void prv_window_load(Window *window) {
   // 5px instead of splitting leftover slack between them.
   s_date_top = top_margin + 2 * s_slot_h + DIGIT_GAP + DIGIT_BAND_BOT_GAP;
 #else
-  int bot_margin = PBL_IF_ROUND_ELSE(32, 2);  // round only; bezel-tuned
+  int bot_margin = PBL_IF_ROUND_ELSE(38, 2);  // round only; bezel-tuned
   s_date_top = bounds.size.h - bot_margin - s_date_h;
 #endif
 

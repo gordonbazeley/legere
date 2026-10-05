@@ -215,8 +215,8 @@ is a touch heavier at 25×25. Fine.
 
 ## Date font: Michroma → Orbitron Bold → Quantico Bold
 
-**Chose:** `Quantico-Bold.ttf` at 16px (gabbro) / 24px, dropping to 20px where
-the locale is too wide (emery) — see "Locale support" below for the glyph
+**Chose:** `Quantico-Bold.ttf` at 20px on gabbro; 24px on emery, dropping to 20px where
+the locale is too wide — see "Locale support" below for the glyph
 subset. Went through two prior fonts to get here.
 
 **Why it changed twice:** Michroma (the original date font) has no bold cut at
@@ -343,3 +343,24 @@ branches for no user (the modern hardware is emery/gabbro/flint).
 
 **Trade-off:** No Pebble Classic / Time / Time Round support. `flint` (Pebble 2
 Duo, B&W) is also unsupported — would need the B&W path back.
+
+## Day/night digit prominence rationale — 2026-10-05
+
+By day, minutes are the prominent digits (solid, larger visual weight) and
+hours secondary: the daytime question is "am I running late?", which needs the
+exact minute. At night this flips: hours are solid and minutes recede to a
+hollow outline, because on waking the question is "should I go back to sleep?",
+which only needs a rough hour. (Previously stated in README; moved here when
+README became user-facing.)
+
+## Gabbro: row overlap and wider date margins — 2026-10-05
+
+**Chose:** `DIGIT_GAP = -14` on gabbro (≈19% of the 80px slot, same ratio as
+emery's −20/103), date font 16→20px (`FONT_DATE_16` resource removed;
+`FONT_DATE_20` now targets both platforms), date row width 174→160, `bot_margin`
+32→38.
+
+**Why:** Store screenshots showed gabbro's rows stacked with a gap while emery
+overlaps, and the date row nearly touching the circular bezel. Raising the row
+widens the chord available; the narrower box leaves ~10px clearance at the
+bottom corners.

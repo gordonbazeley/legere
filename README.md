@@ -1,47 +1,54 @@
-# pebble-watchface
+# legere
 
-A Pebble watchapp/watchface written in C using the Pebble SDK.
+A calm Pebble watchface. Big, bold, overlapping numerals show the exact time,
+with the date underneath. Nothing moves, nothing flashes, nothing to fiddle with.
 
-## Building & running
+Works on **Pebble Time 2** and **Pebble Round 2**.
 
-```sh
-pebble build                          # build for all targetPlatforms (minified; copied to ~/Nextcloud/pbws)
-pebble install --emulator emery       # install on the emery emulator
-pebble install --phone <ip>           # install to a paired phone
-```
+## Day and night
 
-## Target platforms
+By day, the minutes are the bold white digits and the hours sit behind them in
+dark grey. When you glance at your wrist during the day the question is usually
+"am I running late?", which needs the exact minute.
 
-`targetPlatforms` in `package.json` controls which watches you build for. The
-modern Pebble hardware is **emery** (Pebble Time 2), **gabbro** (Pebble Round
-2), and **flint** (Pebble 2 Duo); the original Pebble platforms (aplite,
-basalt, chalk, diorite) are included by default for backwards compatibility.
+Night colour (optional) flips this. Hours turn solid red and minutes become a
+hollow red outline. Waking at night, the question is "should I go back to
+sleep?", which only needs a rough sense of the hour. The red also cuts blue and
+white light so it is easier on your eyes in the dark.
 
-## Project layout
+## Settings
 
-```
-src/c/           C source for the watchapp
-src/pkjs/        PebbleKit JS (phone-side) source, if any
-worker_src/c/    Background worker source, if any
-resources/       Images, fonts, and other bundled resources
-package.json     Project metadata (UUID, platforms, resources, message keys)
-wscript          Build rules — usually no need to edit
-```
+Open the watchface settings in the Pebble app:
 
-By default this project is configured as a watchapp. To make it a watchface,
-set `pebble.watchapp.watchface` to `true` in `package.json`.
+- **Night colour** — on or off (off by default).
+- **Start / end hour** — when Night colour begins and ends, on a 24-hour clock.
 
-## Night colour
+Settings are saved on the watch, so they survive a reconnect.
 
-By day, minutes are the prominent digits (solid, larger visual weight) and
-hours are secondary — the question during the day is "am I running late?",
-which needs the exact minute.
+## Date language
 
-At night, this flips: hours become the prominent (solid) digits and minutes
-recede to a hollow outline. The question on waking at night is "should I go
-back to sleep?", which only needs a rough sense of the hour, not the exact
-minute.
+The date follows your watch's language setting (English, French, German and
+other Latin-script languages).
 
-## Documentation
+## Battery
 
-Full SDK docs, tutorials, and API reference: <https://developer.repebble.com>
+legere uses almost no power itself. Your battery life is mostly decided by watch
+settings, so for the best results:
+
+1. Turn off motion-activated backlight (the biggest single saving).
+2. Set heart-rate background sampling to every 30 minutes or hourly.
+3. Keep notifications modest.
+4. Keep Bluetooth connected and stable.
+5. Run reasonably current PebbleOS.
+
+## Support
+
+Questions or feedback: <https://ko-fi.com/gordonbazeley>
+
+## Credits
+
+By ModusApps. Date text uses [Quantico](https://fonts.google.com/specimen/Quantico)
+and the digits are drawn from [Alfa Slab One](https://fonts.google.com/specimen/Alfa+Slab+One),
+both under the SIL Open Font License.
+
+For developers: see `src/dev_docs/`.

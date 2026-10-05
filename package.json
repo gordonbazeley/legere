@@ -60,17 +60,10 @@
         },
         {
           "type": "font",
-          "name": "FONT_DATE_16",
-          "file": "fonts/Quantico-Bold.ttf",
-          "characterRegex": "[A-Z0-9 .À-Öß]",
-          "targetPlatforms": ["gabbro"]
-        },
-        {
-          "type": "font",
           "name": "FONT_DATE_20",
           "file": "fonts/Quantico-Bold.ttf",
           "characterRegex": "[A-Z0-9 .À-Öß]",
-          "targetPlatforms": ["emery"]
+          "targetPlatforms": ["emery", "gabbro"]
         },
         {
           "type": "font",
