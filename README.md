@@ -1,20 +1,30 @@
 # legere
 
-A calm Pebble watchface. Big, bold, overlapping numerals show the exact time,
-with the date underneath. Nothing moves, nothing flashes, nothing to fiddle with.
+legere is a minimal Pebble watchface built around two ideas:
+
+1. **Minimal battery drain.** It redraws once a minute, shows only the time
+   and date, and has no complications or animation.
+2. **What you need to know differs at night.**
 
 Works on **Pebble Time 2** and **Pebble Round 2**.
 
 ## Day and night
 
-By day, the minutes are the bold white digits and the hours sit behind them in
-dark grey. When you glance at your wrist during the day the question is usually
-"am I running late?", which needs the exact minute.
+**By day, the minutes matter.** Huge overlapping numerals put the exact
+minute in bold white, with the hour behind it in dark grey. A glance tells
+you whether you're running late for your next meeting.
 
-Night colour (optional) flips this. Hours turn solid red and minutes become a
-hollow red outline. Waking at night, the question is "should I go back to
-sleep?", which only needs a rough sense of the hour. The red also cuts blue and
-white light so it is easier on your eyes in the dark.
+**At night, the hour matters.** With Night colour on (optional), the face
+flips: hours turn solid red and minutes become a hollow red outline. Waking
+in the dark, you only need a rough sense of the hour to decide whether you
+can stay in bed. Red also cuts blue and white light, so it's easy on your
+eyes.
+
+## Intentionally limited
+
+If you want weather, steps or heart rate on your face, this isn't it. If
+you want a calm, readable clock that barely touches your battery, it might
+be.
 
 ## Settings
 
@@ -32,7 +42,7 @@ other Latin-script languages).
 
 ## Battery
 
-legere uses almost no power itself. Your battery life is mostly decided by watch
+legere itself uses almost no power. Your battery life is mostly decided by watch
 settings, so for the best results:
 
 1. Turn off motion-activated backlight (the biggest single saving).
@@ -43,7 +53,7 @@ settings, so for the best results:
 
 ## Support
 
-Questions or feedback: <https://ko-fi.com/gordonbazeley>
+Feedback and ideas welcome: <https://ko-fi.com/gordonbazeley>
 
 ## Credits
 
