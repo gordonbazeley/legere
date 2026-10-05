@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Store listing rewritten around two ideas (minimal battery drain; what matters
+  differs at night), with a new tagline.
 - Date font subset now includes Ø–Þ, fixing a missing glyph for French "AOÛT".
 - Gabbro: minute row now overlaps the hour row like emery; date line is 20px
   with more side padding and sits slightly higher, clear of the bezel.

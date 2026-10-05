@@ -8,22 +8,30 @@
 
 ## Tagline (short)
 
-Big, calm, exact time. Turns red at night.
+Light on battery. Shows what matters most, day or night.
 
 ## Description
 
-legere is a calm watchface. Huge overlapping numerals show the exact time,
-with the date underneath. Nothing moves, nothing flashes, nothing to fiddle
-with.
+legere is a minimal watchface built around two ideas:
 
-**By day** the minutes are bold white and the hours sit behind them in dark
-grey. When you glance at your wrist, the question is usually "am I running
-late?", and that needs the exact minute.
+1. **Minimal battery drain.** It redraws once a minute, shows only the time
+   and date, and has no complications or animation.
+2. **What you need to know differs at night.**
 
-**At night** (optional) it flips. Hours turn solid red and minutes become a
-hollow red outline. Waking in the dark, you only need a rough sense of the
-hour to decide whether to go back to sleep, and the red cuts blue and white
-light so it is easy on your eyes.
+**By day, the minutes matter.** Huge overlapping numerals put the exact
+minute in bold white, with the hour behind it in dark grey. A glance tells
+you whether you're running late for your next meeting.
+
+**At night, the hour matters.** Optionally, the face flips: hours turn solid
+red and minutes become a hollow red outline. Waking in the dark, you only
+need a rough sense of the hour to decide whether you can stay in bed. Red
+also cuts blue and white light, so it's easy on your eyes.
+
+It's intentionally limited. If you want weather, steps or heart rate on
+your face, this isn't it. If you want a calm, readable clock that barely
+touches your battery, it might be.
+
+Feedback and ideas welcome: https://ko-fi.com/gordonbazeley
 
 **Features**
 - Large, high-contrast numerals, exact to the minute
@@ -31,7 +39,7 @@ light so it is easy on your eyes.
 - Date follows your watch language (English, French, German and other
   Latin-script languages)
 - Settings are saved on the watch and survive a reconnect
-- Very low power: redraws once a minute and does nothing else
+- Very low power: one redraw a minute, no complications
 
 **Battery tip:** legere itself uses almost nothing. For the longest battery
 life on any watchface, turn off motion-activated backlight and set
