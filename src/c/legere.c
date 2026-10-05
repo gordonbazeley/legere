@@ -12,10 +12,10 @@ static Layer *s_date_layer;
 
 // User setting (phone settings page): dims the face to a low-luminance red
 // during a wall-clock hour window, to cut blue/white light hitting the eyes
-// at night (red wavelengths suppress melatonin least). Off by default —
-// nothing changes unless the user opts in.
-static bool s_night_enabled = false;
-static int s_night_start = 22;  // hour, 0-23, inclusive
+// at night (red wavelengths suppress melatonin least). On by default
+// (21:00-07:00) until the user saves a different choice.
+static bool s_night_enabled = true;
+static int s_night_start = 21;  // hour, 0-23, inclusive
 static int s_night_end = 7;     // hour, 0-23, exclusive; start > end wraps midnight
 #define PERSIST_KEY_NIGHT_ENABLED 196
 #define PERSIST_KEY_NIGHT_START 197
@@ -322,8 +322,9 @@ static void prv_window_load(Window *window) {
   GRect bounds = layer_get_bounds(window_layer);
   window_set_background_color(window, GColorBlack);
 
-  s_night_enabled = persist_exists(PERSIST_KEY_NIGHT_ENABLED) &&
-                    persist_read_bool(PERSIST_KEY_NIGHT_ENABLED);
+  if (persist_exists(PERSIST_KEY_NIGHT_ENABLED)) {
+    s_night_enabled = persist_read_bool(PERSIST_KEY_NIGHT_ENABLED);
+  }
   if (persist_exists(PERSIST_KEY_NIGHT_START)) {
     s_night_start = prv_clamp_hour(persist_read_int(PERSIST_KEY_NIGHT_START));
   }

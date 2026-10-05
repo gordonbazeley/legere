@@ -17,7 +17,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>legere · Settings</title>
+<title>Legere · Settings</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Michroma&display=swap" rel="stylesheet" />
@@ -65,7 +65,7 @@
 <body>
 <div class="app">
   <header class="hd">
-    <h1 class="wordmark">legere</h1>
+    <h1 class="wordmark">Legere</h1>
     <p class="tagline">A quiet watchface.</p>
   </header>
   <main class="body">
@@ -95,14 +95,14 @@
     <section>
       <p class="seclabel">Support</p>
       <div class="card">
-        <p>legere is free and always will be. If it's earned a spot on your watch, you can say thanks with a coffee &mdash; entirely optional, hugely appreciated.</p>
+        <p>Legere is free and always will be. If it's earned a spot on your watch, you can say thanks with a coffee &mdash; entirely optional, hugely appreciated.</p>
         <a class="kofi" href="https://ko-fi.com/gordonbazeley">
           <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy me a coffee on Ko-fi" />
         </a>
       </div>
     </section>
   </main>
-  <p class="foot">legere &middot; watchface for Pebble</p>
+  <p class="foot">Legere &middot; watchface for Pebble</p>
 </div>
 <script>
   /*INIT*/
@@ -120,7 +120,7 @@
       }));
     };
 
-    var night = (typeof NIGHT !== 'undefined') ? NIGHT : { enabled: false, start: 21, end: 7 };
+    var night = (typeof NIGHT !== 'undefined') ? NIGHT : { enabled: true, start: 21, end: 7 };
     var startSel = document.getElementById('nightStart');
     var endSel = document.getElementById('nightEnd');
     for (var h = 0; h < 24; h++) {

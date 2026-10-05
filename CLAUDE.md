@@ -1,4 +1,4 @@
-# legere
+# Legere
 
 Pebble watchface (C + PebbleKit JS), targets emery and gabbro.
 

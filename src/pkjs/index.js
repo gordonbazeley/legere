@@ -18,12 +18,12 @@ function clampHour(n, fallback) {
 function currentNight() {
   try {
     return {
-      enabled: localStorage.getItem('nightEnabled') === '1',
+      enabled: localStorage.getItem('nightEnabled') !== '0',
       start: Number(localStorage.getItem('nightStart') || 21),
       end: Number(localStorage.getItem('nightEnd') || 7),
     };
   } catch (e) {
-    return { enabled: false, start: 21, end: 7 };
+    return { enabled: true, start: 21, end: 7 };
   }
 }
 

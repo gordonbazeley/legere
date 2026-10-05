@@ -1,4 +1,4 @@
-# legere — Key Decisions
+# Legere — Key Decisions
 
 ## 5-minute grid and "Time refresh" setting — removed 2026-09-28
 
@@ -32,7 +32,7 @@ current behaviour.
 **Chose:** Keep the passive 5-minute repaint grid — the same cadence during
 Quiet Time as any other time, no hourly fallback (see "Quiet Time keeps the
 same 5-minute grid" below) — as a defining feature of the face — "the minutes
-are soft unless you ask" — and stop framing legere as a "lowest-power"
+are soft unless you ask" — and stop framing Legere as a "lowest-power"
 watchface.
 
 **Why it changed:** The original thesis (commit `89c0224`, "low-power TTMM-style
@@ -43,7 +43,7 @@ estimated **~6–26 µA — under one day over three weeks**, below telemetry no
 The real drains are motion-activated backlight, notifications/vibration,
 HR sampling, and BLE reconnect churn — none of which a watchface controls.
 
-**Trade-off:** legere can no longer claim battery life as its headline. It keeps
+**Trade-off:** Legere can no longer claim battery life as its headline. It keeps
 the mechanic because the interaction (a calm, approximate readout you can sharpen
 with a shake) is liked on its own merits — five commits of refinement went into
 the shake path. The 21-day target stays as "should hit it anyway by doing
@@ -281,7 +281,7 @@ always-accurate clock instead.
 
 **Trade-off:** This is explicitly temporary — **remove this setting** (and
 the `RedrawMode` message key, `PERSIST_KEY_REDRAW_MODE`, `s_every_minute`, and
-the settings-page section) once touch is enabled for watchapps and legere can
+the settings-page section) once touch is enabled for watchapps and Legere can
 just let a screen tap reveal the exact minute, matching how shake/tap already
 work. Until then it's one more piece of state and one more settings-page
 section for what should eventually be unnecessary. Also reopens "no custom
@@ -364,3 +364,17 @@ emery's −20/103), date font 16→20px (`FONT_DATE_16` resource removed;
 overlaps, and the date row nearly touching the circular bezel. Raising the row
 widens the chord available; the narrower box leaves ~10px clearance at the
 bottom corners.
+
+## Night colour on by default, 21:00–07:00 — 2026-10-05
+
+**Chose:** Night colour defaults to on with window 21:00–07:00 on the watch
+(`legere.c`), the phone companion (`index.js`) and the settings-page preview
+fallback. Watch start default moved 22→21 to match the phone.
+
+**Why:** The face is pitched around "what matters differs at night"; an
+opt-in default meant new users never saw it. Previously the watch said
+22:00 but the phone said 21:00, so the settings page was the only effective
+default.
+
+**Migration:** Users who have saved a choice have a persisted/localStorage
+value and keep it. Users who never opened settings now get night mode on.

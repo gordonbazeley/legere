@@ -1,4 +1,4 @@
-# legere — Architecture
+# Legere — Architecture
 
 ## What it is
 
@@ -113,7 +113,7 @@ palette in-place before each blit — `GColorDarkGray`/`GColorWhite` by day,
 
 ## Repaint schedule (`prv_tick_handler`)
 
-The OS wakes the app every minute for its own clock; legere repaints on every
+The OS wakes the app every minute for its own clock; Legere repaints on every
 tick.
 
 ## Power model
@@ -124,7 +124,7 @@ sampling, BLE reconnect churn, then pathological watchface behaviour
 (`SECOND_UNIT`, per-tick animation, timed network fetches). A minute-updating
 static face with no animation is **not** in the top five.
 
-legere's controllable levers, in full:
+Legere's controllable levers, in full:
 1. Load bitmaps/fonts once in `prv_window_load`, never per-redraw — **done**.
 2. Keep `graphics_text_layout_get_content_size` (`prv_measure`) off the redraw
    path — **done** (only called in `prv_window_load`).
@@ -141,7 +141,7 @@ to backlight/BLE/HR drains.
 
 ## Battery guidance (for the store listing)
 
-legere's own draw is negligible; a Pebble Time 2 owner's battery life is set
+Legere's own draw is negligible; a Pebble Time 2 owner's battery life is set
 almost entirely by system settings. What to tell users in the listing:
 
 1. **Turn off motion-activated backlight.** The single biggest lever — forum
@@ -161,8 +161,8 @@ almost entirely by system settings. What to tell users in the listing:
    it's the disconnect/reconnect churn that's expensive.
 5. Run reasonably current PebbleOS — early firmware had battery bugs.
 
-With all of that, ~21 days is realistic and legere does nothing to stop it. None
-of it is legere-specific; it applies to any minimal watchface.
+With all of that, ~21 days is realistic and Legere does nothing to stop it. None
+of it is Legere-specific; it applies to any minimal watchface.
 
 ## Diagnostic log — removed 2026-09-07
 

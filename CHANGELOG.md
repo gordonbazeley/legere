@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- App name is now styled "Legere" in the watch display name, settings page,
+  README, store listing and docs (filenames and npm name stay lowercase).
+- Night colour is now on by default, 21:00–07:00 (watch default aligned with the
+  settings page). Existing users who saved a choice keep it.
 - Store listing rewritten around two ideas (minimal battery drain; what matters
   differs at night), with a new tagline; README intro and day/night sections mirror it.
 - Date font subset now includes Ø–Þ, fixing a missing glyph for French "AOÛT".

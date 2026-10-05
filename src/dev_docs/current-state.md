@@ -1,4 +1,4 @@
-# legere — Current State
+# Legere — Current State
 
 ## What works
 

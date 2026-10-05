@@ -1,10 +1,10 @@
-# legere
+# Legere
 
-legere is a minimal Pebble watchface built around two ideas:
+Legere is a minimal Pebble watchface built around two ideas:
 
 1. **Minimal battery drain.** It redraws once a minute, shows only the time
    and date, and has no complications or animation.
-2. **What you need to know differs at night.**
+2. **What you need to know differs at night**
 
 Works on **Pebble Time 2** and **Pebble Round 2**.
 
@@ -14,11 +14,11 @@ Works on **Pebble Time 2** and **Pebble Round 2**.
 minute in bold white, with the hour behind it in dark grey. A glance tells
 you whether you're running late for your next meeting.
 
-**At night, the hour matters.** With Night colour on (optional), the face
-flips: hours turn solid red and minutes become a hollow red outline. Waking
-in the dark, you only need a rough sense of the hour to decide whether you
-can stay in bed. Red also cuts blue and white light, so it's easy on your
-eyes.
+**At night, the hour matters.** From 21:00 to 07:00 by default (adjustable,
+or switch it off), the face flips: hours turn solid red and minutes become a
+hollow red outline. Waking in the dark, you only need a rough sense of the
+hour to decide whether you can stay in bed. Red also cuts blue and white
+light, so it's easy on your eyes.
 
 ## Intentionally limited
 
@@ -30,8 +30,9 @@ be.
 
 Open the watchface settings in the Pebble app:
 
-- **Night colour** — on or off (off by default).
-- **Start / end hour** — when Night colour begins and ends, on a 24-hour clock.
+- **Night colour** — on or off (on by default).
+- **Start / end hour** — when Night colour begins and ends, on a 24-hour clock
+  (21:00 to 07:00 by default).
 
 Settings are saved on the watch, so they survive a reconnect.
 
@@ -42,7 +43,7 @@ other Latin-script languages).
 
 ## Battery
 
-legere itself uses almost no power. Your battery life is mostly decided by watch
+Legere itself uses almost no power. Your battery life is mostly decided by watch
 settings, so for the best results:
 
 1. Turn off motion-activated backlight (the biggest single saving).
@@ -53,12 +54,21 @@ settings, so for the best results:
 
 ## Support
 
-Feedback and ideas welcome: <https://ko-fi.com/gordonbazeley>
+Feedback and ideas are welcome. 
 
-## Credits
+Ruckpebble is free and always will be. If it's earned a spot on your watch, you can say thanks with a coffee. No pressure, entirely optional, and hugely appreciated.
 
-By ModusApps. Date text uses [Quantico](https://fonts.google.com/specimen/Quantico)
+Doctor's orders: one coffee a day. So it had better be a good one :-)
+
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/gordonbazeley)
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2.png?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/gordonbazeley)
+
+## Thanks
+
+Date text uses [Quantico](https://fonts.google.com/specimen/Quantico)
 and the digits are drawn from [Alfa Slab One](https://fonts.google.com/specimen/Alfa+Slab+One),
 both under the SIL Open Font License.
 
-For developers: see `src/dev_docs/`.
+## Development
+* Developers: see `src/dev_docs/`.

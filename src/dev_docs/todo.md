@@ -1,4 +1,4 @@
-# legere — Todo
+# Legere — Todo
 
 Rough-priority order. Mark done or delete when shipped. Context for all of this
 is the grill session captured in `decisions.md`.
@@ -113,7 +113,7 @@ is the grill session captured in `decisions.md`.
   description copy. Pull the battery guidance from `architecture.md` → "Battery
   guidance (for the store listing)" into the description.
 - [x] `author` in `package.json` set to `ModusApps` (matches `~/src/tidepebble`).
-  Still confirm `displayName` (`legere`) / `uuid` before store submit.
+  Still confirm `displayName` (`Legere`) / `uuid` before store submit.
 
 ## Research — done
 
@@ -126,7 +126,7 @@ is the grill session captured in `decisions.md`.
 ## Housekeeping
 
 - [ ] `README.md` still says "pebble-watchface" / generic boilerplate — rewrite
-  it for legere (what it is, the shake mechanic, build steps).
+  it for Legere (what it is, the shake mechanic, build steps).
 - [x] `design/plain.png` superseded mockup — deleted.
 - [x] `icon.png` keyline change — committed (`4cb6c23`).
 - [x] `resources/fonts/MichromaText.ttf` unused since the locale work — deleted.

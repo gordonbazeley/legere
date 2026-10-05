@@ -1,6 +1,6 @@
 # Removing the 5-minute refresh logic — code and battery impact
 
-Investigated 2026-09-10. Question: how much simpler would legere be without the
+Investigated 2026-09-10. Question: how much simpler would Legere be without the
 5-minute soft grid, and would it help battery? Answers: **much simpler** (two
 readings below), **battery no**.
 
