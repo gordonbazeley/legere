@@ -29,13 +29,11 @@ function currentNight() {
 
 function syncNight() {
   var night = currentNight();
-  if (night.enabled || localStorage.getItem('nightEnabled') !== null) {
-    Pebble.sendAppMessage({
-      'NightEnabled': night.enabled ? 1 : 0,
-      'NightStart': clampHour(night.start, 21),
-      'NightEnd': clampHour(night.end, 7),
-    });
-  }
+  Pebble.sendAppMessage({
+    'NightEnabled': night.enabled ? 1 : 0,
+    'NightStart': clampHour(night.start, 21),
+    'NightEnd': clampHour(night.end, 7),
+  });
 }
 
 Pebble.addEventListener('ready', syncNight);

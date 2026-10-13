@@ -21,12 +21,8 @@ static int s_night_end = 7;     // hour, 0-23, exclusive; start > end wraps midn
 #define PERSIST_KEY_NIGHT_START 197
 #define PERSIST_KEY_NIGHT_END 198
 
-// Dim red/amber ink, used in place of the white/gray palette during the
-// night window. Bumped one step up Pebble's quantized red ramp from the
-// original DarkCandyAppleRed/BulgarianRose pair — that was too dark to read
-// comfortably.
+// Red ink used in place of the white/gray palette during the night window.
 #define NIGHT_INK GColorRed
-#define NIGHT_INK_DIM GColorDarkCandyAppleRed
 
 static int prv_clamp_hour(int h) {
   if (h < 0) return 0;
@@ -225,7 +221,6 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
 
   bool h24 = clock_is_24h_style();
   int hour = prv_display_hour(t);
-  int disp_min = t->tm_min;
 
   // Hour and minute stacked: two digits per row, the pair centred as a unit so a
   // narrow "1" doesn't shove the block sideways. On emery DIGIT_GAP is negative,
@@ -242,7 +237,7 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   GColor hour_ink = night ? NIGHT_INK : GColorDarkGray;
   GColor min_ink = night ? NIGHT_INK : GColorWhite;
   if (s_sheet) {
-    int dv[4] = { hour / 10, hour % 10, disp_min / 10, disp_min % 10 };
+    int dv[4] = { hour / 10, hour % 10, t->tm_min / 10, t->tm_min % 10 };
     bool blank_hour_tens = !h24 && hour < 10;
 
     graphics_context_set_compositing_mode(ctx, GCompOpSet);
@@ -269,7 +264,7 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
     // Resource-load failure only: fall back to plain text.
     char hour_str[4], min_str[4];
     snprintf(hour_str, sizeof hour_str, h24 ? "%02d" : "%d", hour);
-    snprintf(min_str, sizeof min_str, "%02d", disp_min);
+    snprintf(min_str, sizeof min_str, "%02d", t->tm_min);
     GFont f = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
     prv_draw_cell(ctx, GRect(s_pad, s_digit_band_top, s_usable_w, 48),
                   hour_str, f, GTextAlignmentRight, GColorWhite);
@@ -278,16 +273,11 @@ static void prv_digits_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
-// Whole date line is drawn in this one colour. White reads cleanly on
-// the unlit transflective LCD without adding a second signal colour; swapped
-// for NIGHT_INK during the night window (see prv_is_night).
-static GColor prv_date_color(int hour) { return prv_is_night(hour) ? NIGHT_INK : GColorWhite; }
-
 // Date row: weekday left, day-of-month centre, month right — three L/C/R strings
 // over one shared box (the font is too wide to force equal thirds and stay
-// legible). Whole row is one colour — white, or NIGHT_INK during the night
-// window — no freshness signal here. The box is layer-relative (y = 0):
-// s_date_layer is framed at s_date_top.
+// legible). Whole row is one colour: white reads cleanly on the unlit
+// transflective LCD; NIGHT_INK during the night window. The box is
+// layer-relative (y = 0): s_date_layer is framed at s_date_top.
 static void prv_date_update_proc(Layer *layer, GContext *ctx) {
   struct tm *t = &s_now;
 
@@ -300,7 +290,7 @@ static void prv_date_update_proc(Layer *layer, GContext *ctx) {
     s_str_mday = t->tm_mday;
   }
 
-  GColor color = prv_date_color(t->tm_hour);
+  GColor color = prv_is_night(t->tm_hour) ? NIGHT_INK : GColorWhite;
   int date_w = PBL_IF_ROUND_ELSE(160, s_usable_w);  // round: narrower than usable so the row clears the arc
   GRect date_box = GRect(s_pad + (s_usable_w - date_w) / 2, 0, date_w, s_date_h);
   prv_draw_cell(ctx, date_box, s_dow, s_date_font, GTextAlignmentLeft, color);

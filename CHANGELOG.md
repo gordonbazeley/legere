@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Cleanup: removed unused dim night ink, a single-use colour helper and an
+  always-true guard in the phone-side night sync; `tools/check.js` now expects
+  the on-by-default night settings to sync at startup.
+
 - Settings page header: Alfa Slab One wordmark with an inline SVG feather, a
   black-to-red gradient (matching Night colour red), and the new tagline on
   two lines; footer line removed.

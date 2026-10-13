@@ -16,7 +16,7 @@ var context = {
 };
 vm.runInNewContext(fs.readFileSync('src/pkjs/index.js', 'utf8'), context);
 handlers.ready();
-assert.strictEqual(sent, undefined);
+assert.deepStrictEqual(Object.assign({}, sent), { NightEnabled: 1, NightStart: 21, NightEnd: 7 });
 handlers.webviewclosed({ response: encodeURIComponent(JSON.stringify({
   nightEnabled: 1, nightStart: -4, nightEnd: 99,
 })) });
